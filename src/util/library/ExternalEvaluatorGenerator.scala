@@ -39,6 +39,8 @@ object ExternalEvaluatorGenerator
         name match
         {
             case "interpolator.1d.unit.cubicHermite" => generateContinuousEvaluator( source, objectHandle, name )
+            case "interpolator.2d.unit.bicubicHermite" => generateContinuousEvaluator( source, objectHandle, name )
+            case "interpolator.3d.unit.tricubicHermite" => generateContinuousEvaluator( source, objectHandle, name )
             case "interpolator.1d.unit.linearLagrange" => generateContinuousEvaluator( source, objectHandle, name )
             case "interpolator.2d.unit.bilinearLagrange" => generateContinuousEvaluator( source, objectHandle, name )
             case "interpolator.3d.unit.trilinearLagrange" => generateContinuousEvaluator( source, objectHandle, name )
@@ -84,8 +86,8 @@ object ExternalEvaluatorGenerator
         val cubicHermiteParamNames = Array[String](
             null,
             "parameters.1d.unit.cubicHermite.argument",
-            null,
-            null,
+            "parameters.2d.unit.bicubicHermite.argument",
+            "parameters.3d.unit.tricubicHermite.argument",
             null
             )
 
@@ -98,18 +100,51 @@ object ExternalEvaluatorGenerator
         
         val booleanName = "boolean"
 
-        val fparams =
+
+        /** e.g. for Hermite bases, the following Haskell code will compute the correct reordering...
+         * let bases = [[(0,0)],[(1,0)],[(0,1)],[(1,1)]]
+         * let outer x y = concatMap (\x' -> map (++x') x) y
+         * let derivOrder 0 = [[]]; derivOrder n = (derivOrder (n-1)) ++ map ((n-1):) (derivOrder (n-1))
+         * let pointOrder' 0 = [[]]; pointOrder' n = (map (0:) (pointOrder' (n-1))) ++ (map (1:) (pointOrder' (n-1)))
+         * let pointOrder n = map reverse (pointOrder' n)
+         * let targetOrder n = [(p, d) | p <- pointOrder n, d <- derivOrder n]
+         * let targetToBasis (pt, d) = map (\i -> (if i `elem` d then 1 else 0, pt!!i)) [0..(length pt - 1)]
+         * let targetBasisOrder n = map targetToBasis (targetOrder n)
+         * let tensorProdOrder n = foldl' (\s _ -> bases `outer` s) [[]] [0..(n-1)]
+         * let computePermutation from to = map (\tov -> fromJust $ tov `elemIndex` from) to
+         * let permArray n = computePermutation (targetBasisOrder n) (tensorProdOrder n)
+         */
+        def reorder(indices : Array[Int])(params : Array[Double]) =
+          (indices map ( (index : Int) => params(index)))
+        val fparams : ((Array[Double], Array[Double]) => Array[Double], String, String,
+                       (Array[Double]) => Array[Double]) =
         name match
         {
-            case "interpolator.1d.unit.cubicHermite" => ( new CubicHermite( 1 ).evaluate _, xiNames( 1 ), cubicHermiteParamNames( 1 ) )
-            case "interpolator.1d.unit.linearLagrange" => ( new LinearLagrange( 1 ).evaluate _, xiNames( 1 ), linearParamNames( 1 ) )
-            case "interpolator.2d.unit.bilinearLagrange" => ( new LinearLagrange( 2 ).evaluate _, xiNames( 2 ), linearParamNames( 2 ) )
-            case "interpolator.3d.unit.trilinearLagrange" => ( new LinearLagrange( 3 ).evaluate _, xiNames( 3 ), linearParamNames( 3 ) )
-            case "interpolator.1d.unit.quadraticLagrange" => ( new QuadraticLagrange( 1 ).evaluate _, xiNames( 1 ), quadraticParamNames( 1 ) )
-            case "interpolator.2d.unit.biquadraticLagrange" => ( new QuadraticLagrange( 2 ).evaluate _, xiNames( 2 ), quadraticParamNames( 2 ) )
-            case "interpolator.3d.unit.triquadraticLagrange" => ( new QuadraticLagrange( 3 ).evaluate _, xiNames( 3 ), quadraticParamNames( 3 ) )
-            case "interpolator.2d.unit.bilinearSimplex" => ( new BilinearSimplex().evaluate _, xiNames( 2 ), linearSimplexParamNames( 2 ) )
-            case "refinement.square.2x2.xi" => ( new GridRefinementXi( Array( 2, 2 ) ).evaluate _, xiNames( 2 ), xiNames( 2 ) )
+            case "interpolator.1d.unit.cubicHermite" => ( new CubicHermite( 1 ).evaluate _, xiNames( 1 ), cubicHermiteParamNames( 1 ), 
+                                                          identity (_ : Array[Double])
+                                                        )
+            case "interpolator.2d.unit.bicubicHermite" => ( new CubicHermite( 2 ).evaluate _, xiNames( 2 ), cubicHermiteParamNames( 2 ),
+                                                            reorder(Array(0,1,4,5,2,3,6,7,8,9,12,13,10,11,14,15)))
+            case "interpolator.3d.unit.tricubicHermite" => ( new CubicHermite( 3 ).evaluate _, xiNames( 3 ), cubicHermiteParamNames( 3 ),
+                                                            reorder(Array(0,1,8,9,2,3,10,11,16,17,24,25,18,19,26,27,4,5,12,13,6,7,14,15,20,21,
+                                                                          28,29,22,23,30,31,32,33,40,41,34,35,42,43,48,49,56,57,50,51,58,59,36,
+                                                                          37,44,45,38,39,46,47,52,53,60,61,54,55,62,63)))
+            case "interpolator.1d.unit.linearLagrange" => ( new LinearLagrange( 1 ).evaluate _, xiNames( 1 ), linearParamNames( 1 ),
+                                                           identity (_ : Array[Double]))
+            case "interpolator.2d.unit.bilinearLagrange" => ( new LinearLagrange( 2 ).evaluate _, xiNames( 2 ), linearParamNames( 2 ),
+                                                              identity (_ : Array[Double]))
+            case "interpolator.3d.unit.trilinearLagrange" => ( new LinearLagrange( 3 ).evaluate _, xiNames( 3 ), linearParamNames( 3 ),
+                                                               identity (_ : Array[Double]))
+            case "interpolator.1d.unit.quadraticLagrange" => ( new QuadraticLagrange( 1 ).evaluate _, xiNames( 1 ), quadraticParamNames( 1 ),
+                                                               identity (_ : Array[Double]))
+            case "interpolator.2d.unit.biquadraticLagrange" => ( new QuadraticLagrange( 2 ).evaluate _, xiNames( 2 ), quadraticParamNames( 2 ),
+                                                                 identity (_ : Array[Double]))
+            case "interpolator.3d.unit.triquadraticLagrange" => ( new QuadraticLagrange( 3 ).evaluate _, xiNames( 3 ), quadraticParamNames( 3 ),
+                                                                 identity (_ : Array[Double]))
+            case "interpolator.2d.unit.bilinearSimplex" => ( new BilinearSimplex().evaluate _, xiNames( 2 ), linearSimplexParamNames( 2 ),
+                                                             identity (_ : Array[Double]))
+            case "refinement.square.2x2.xi" => ( new GridRefinementXi(Array( 2, 2 ) ).evaluate _, xiNames( 2 ), xiNames( 2 ),
+                                                 identity (_ : Array[Double]))
             case _ => System.err.println( "Unknown external evaluator " + name ); return null
         }
         
@@ -129,7 +164,9 @@ object ExternalEvaluatorGenerator
         
         val localName = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
     
-        return new ContinuousFunctionEvaluatorValueSource( localName, fparams._1, xiVariable, phiVariable, evaluatorType )
+        return new ContinuousFunctionEvaluatorValueSource(
+          localName, (xi : Array[Double], params : Array[Double]) => fparams._1(xi, fparams._4(params)),
+          xiVariable, phiVariable, evaluatorType )
     }
     
     

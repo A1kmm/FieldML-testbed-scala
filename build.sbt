@@ -151,6 +151,8 @@ traceLevel := 20
 // add the FieldML API to the unmanaged classpath
 unmanagedJars in Compile <+= baseDirectory map (_ / ".." / "fieldml.api" / "jni" / "fieldml.jar")
 
+unmanagedJars in Compile <+= baseDirectory map (_ / "jars" / "kd.jar")
+
 // publish test jar, sources, and docs
 // publishArtifact in Test := true
 
