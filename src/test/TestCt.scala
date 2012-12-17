@@ -50,7 +50,7 @@ object TestCt
         region.bind( mesh2Argument, 5, 0.5 )
         println( "*** aggregate1 = " + region.evaluate( test ) )
 
-        val colladaXml = exporter( region, 1, meshCoordinatesName, mesh1ArgumentName, mesh2ArgumentName )
+        val colladaXml = exporter( regionName, region, 1, meshCoordinatesName, mesh1ArgumentName, mesh2ArgumentName )
         
         val f = new FileWriter( outputName )
         f.write( colladaXml )

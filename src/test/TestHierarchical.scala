@@ -41,7 +41,7 @@ object TestHierarchical
         region.bind( meshArgument, 1, 1.0, 0.99 )
         println( "*** aggregate1 = " + region.evaluate( test ) )
 
-        val colladaXml = ColladaExporter.export2DFromFieldML( region, 32, meshArgumentName, meshCoordinatesName )
+        val colladaXml = ColladaExporter.export2DFromFieldML( regionName, region, 32, meshArgumentName, meshCoordinatesName )
         
         val f = new FileWriter( outputName )
         f.write( colladaXml )

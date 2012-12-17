@@ -62,7 +62,7 @@ object BilinearSimplexReadTest
 
         println( "*** aggregate = " + region.evaluate( coordinates ) )
 
-        val colladaXml = exporter( region, 1, meshArgumentName, meshCoordinatesName )
+        val colladaXml = exporter(regionName, region, 1, meshArgumentName, meshCoordinatesName)
         
         val f = new FileWriter( outputName )
         f.write( colladaXml )

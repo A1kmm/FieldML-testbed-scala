@@ -20,17 +20,19 @@ abstract class MeshExporter
     protected val openPolygon : String
     protected val closePolygon : String
 
-    protected def fillInTemplate( xyzArray : StringBuilder, polygonBlock : StringBuilder, polygonCount : Int,
-        vertexCount : Int, xyzArrayCount : Int ) : String =
+    protected def fillInTemplate(outputName : String, xyzArray : StringBuilder,
+                                 polygonBlock : StringBuilder, polygonCount : Int,
+                                 vertexCount : Int, xyzArrayCount : Int ) : String =
     {
         def replacements(m : Regex.Match) : String =
           {
             m.group(1) match {
-              case "xyzArrayCount" => ("" + xyzArrayCount)
-              case "xyzArray"      => xyzArray.toString()
-              case "vertexCount"   => ("" + vertexCount)
-              case "polygonCount"  => ("" + polygonCount)
+              case "name"          => outputName
               case "polygonBlock"  => polygonBlock.toString()
+              case "polygonCount"  => ("" + polygonCount)
+              case "vertexCount"   => ("" + vertexCount)
+              case "xyzArray"      => xyzArray.toString()
+              case "xyzArrayCount" => ("" + xyzArrayCount)
               case _               => ""
             }
           }
@@ -78,7 +80,11 @@ abstract class MeshExporter
         }
     }
 
-    def export3DFromFieldML( region : Region, discretisation : Int, meshName : String, evaluatorName : String ) : String =
+    def export3DFromFieldML(
+      outputName : String,
+      region : Region, discretisation : Int,
+      meshName : String, evaluatorName : String
+    ) : String =
     {
         val meshVariable : ArgumentEvaluator = region.getObject( meshName )
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
@@ -138,10 +144,11 @@ abstract class MeshExporter
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate( xyzArray, polygonBlock, polygonCount*2, vertexCount*2, xyzArrayCount*2 )
+        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount*2, vertexCount*2, xyzArrayCount*2)
     }
 
     def export3DFromFieldMLBind2Meshes(
+          outputName : String,
           region : Region, discretisation : Int, evaluatorName : String,
           mesh1Name : String, mesh2Name : String ) : String =
     {
@@ -202,6 +209,6 @@ abstract class MeshExporter
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementNumber
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate( xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount )
+        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
     }
 }

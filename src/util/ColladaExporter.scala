@@ -111,7 +111,9 @@ $polygonBlock
     protected val openPolygon = "<p>"
     protected val closePolygon = "</p>\n"
 
-    def export2DFromFieldML( region : Region, discretisation : Int, meshName : String, evaluatorName : String ) : String =
+    def export2DFromFieldML(
+      outputName : String, region : Region, discretisation : Int,
+      meshName : String, evaluatorName : String) : String =
     {
         val meshVariable : ArgumentEvaluator = region.getObject( meshName )
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
@@ -161,11 +163,13 @@ $polygonBlock
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate( xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount )
+        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
     }
 
 
-    def export2DTrisFromFieldML( region : Region, discretisation : Int, meshName : String, evaluatorName : String ) : String =
+    def export2DTrisFromFieldML(
+      outputName : String, region : Region, discretisation : Int,
+      meshName : String, evaluatorName : String) : String =
     {
         val meshVariable : ArgumentEvaluator = region.getObject( meshName )
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
@@ -223,11 +227,13 @@ $polygonBlock
         val vertexCount = 3 * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate( xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount )
+        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
     }
 
 
-    def export2DFromFieldML( region : Region, discretisation : Int, meshName : String, geometryName : String, valueName : String ) : String =
+    def export2DFromFieldML(
+      outputName : String, region : Region, discretisation : Int, meshName : String,
+      geometryName : String, valueName : String) : String =
     {
         val meshVariable : ArgumentEvaluator = region.getObject( meshName )
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
@@ -280,10 +286,12 @@ $polygonBlock
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate( xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount )
+        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
     }
 
-    def export1DFromFieldML( region : Region, discretisation : Int, meshName : String, evaluatorName : String ) : String =
+    def export1DFromFieldML(
+      outputName : String, region : Region, discretisation : Int, meshName : String,
+      evaluatorName : String ) : String =
     {
         val meshVariable : ArgumentEvaluator = region.getObject( meshName )
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
@@ -340,6 +348,6 @@ $polygonBlock
         val vertexCount = ( discretisation + 1 ) * 2 * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate( xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount )
+        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
     }
 }

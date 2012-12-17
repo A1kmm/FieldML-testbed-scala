@@ -36,7 +36,7 @@ object EvaluateFieldAt
       println("Usage: EvaluateFieldAt xmlFilePath region expression\r\n" +
               "expression: empty | bind name value expression | evaluate name expression\r\n" +
               "                  | evaluateImage filename outputEval valueEval coordEval\r\n" +
-              "                  | evaluateCollada3d filename discretisationPointsPerXiPerMesh meshArgumentInputEval nodalPosEval\r\n" +
+              "                  | evaluateCollada3d filename outputMeshName discretisationPointsPerXiPerMesh meshArgumentInputEval nodalPosEval\r\n" +
               "name, region: dotted FieldML identifiers\r\n" +
               "value: A series of values (value production below) surrounded by []\r\n" +
               "value: meshValue int listOfDoubleValuesSpaceSeparated | ensembleValue int | continuousValue listOfDoubleValues")
@@ -114,9 +114,9 @@ object EvaluateFieldAt
             }
             ImageIO.write(bim, "PNG", new File(fn));
           }
-          case EvaluateCollada3DAction(fn, discretisation, meshEvalName, rc3EvalName) => {
+          case EvaluateCollada3DAction(fn, outMeshName, discretisation, meshEvalName, rc3EvalName) => {
             val fw = new FileWriter(fn)
-            val res = ColladaExporter.export3DFromFieldML(region, discretisation, meshEvalName, rc3EvalName)
+            val res = ColladaExporter.export3DFromFieldML(outMeshName, region, discretisation, meshEvalName, rc3EvalName)
             fw.write(res)
             fw.close()
           }
@@ -130,7 +130,7 @@ object EvaluateFieldAt
   case class BindParameterAction(bindArgumentName : String, bindValues : MakeValue) extends FieldAction
   case class EvaluateAction(evaluateField : String) extends FieldAction
   case class EvaluateImageAction(storeTo : String, inputEval : String, valueEval : String, coordEval : String) extends FieldAction
-  case class EvaluateCollada3DAction(storeTo : String, discretisation : Int, meshValueEval : String, rc3Eval : String) extends FieldAction
+  case class EvaluateCollada3DAction(storeTo : String, outMeshName : String, discretisation : Int, meshValueEval : String, rc3Eval : String) extends FieldAction
   abstract class MakeValue
   case class MeshMakeValue(meshElement : Int, meshXIs : List[Double]) extends MakeValue
   case class EnsembleMakeValue(ensembleID : Int) extends MakeValue
@@ -154,11 +154,12 @@ object EvaluateFieldAt
     def evaluateCollada3DActionParser =
       "evaluateCollada3d" ~>
         commit(regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ~
+               regex(new Regex("[A-Z|a-z|0-9|_|]+")) ~
                intParser ~
                regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ~
                regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ^^
-               (p => p match { case fn~discretisation~inputEval~coordEval =>
-                 new EvaluateCollada3DAction(fn, discretisation, inputEval, coordEval) }))
+               (p => p match { case fn~outputMeshName~discretisation~inputEval~coordEval =>
+                 new EvaluateCollada3DAction(fn, outputMeshName, discretisation, inputEval, coordEval) }))
 
     def valueParser = meshValueParser | ensembleValueParser | continuousValueParser
     def meshValueParser = "meshValue" ~> commit(intParser ~ rep(doubleParser) ^^

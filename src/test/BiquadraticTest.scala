@@ -185,13 +185,13 @@ object BiquadraticTest
 
         println( "*** aggregate(2, 0.5, 0.5) = " + region.evaluate( aggregate ) )
         
-        val colladaXml = ColladaExporter.export2DFromFieldML( region, 8, "test.mesh", "test.aggregate" )
+        val colladaXml = ColladaExporter.export2DFromFieldML("test", region, 8, "test.mesh", "test.aggregate")
         
         val f = new FileWriter( "collada nine quads.xml" )
         f.write( colladaXml )
         f.close()
 
-        val json = JSONExporter.export2DFromFieldML( region, 8, "test.mesh", "test.aggregate" )
+        val json = JSONExporter.export2DFromFieldML(region, 8, "test.mesh", "test.aggregate")
         
         val jsonFile = new FileWriter( "WebGL/test3_biquad.json" )
         jsonFile.write( json )

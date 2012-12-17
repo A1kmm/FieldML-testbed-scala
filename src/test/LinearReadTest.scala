@@ -35,7 +35,7 @@ object LinearReadTest
 
         println( "*** aggregate = " + region.evaluate( coordinates ) )
 
-        val colladaXml = ColladaExporter.export1DFromFieldML( region, 1, configStrings._3, configStrings._4 )
+        val colladaXml = ColladaExporter.export1DFromFieldML( "P2BRP001_H653_Grown", region, 1, configStrings._3, configStrings._4 )
 
         val f = new FileWriter( "collada linear.xml" )
         f.write( colladaXml )
