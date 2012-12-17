@@ -20,7 +20,7 @@ object EnsembleTypeSerializer
         val elementArray = valueType.elementSet.toArray
         
         //NOTE elementArray is a bitset array, and is therefore already sorted and without duplicates.
-        val min = elementArray.first
+        val min = elementArray.head
         val max = elementArray.last
         var stride = 1
         if( elementArray.size > 1 )
