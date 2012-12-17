@@ -30,7 +30,7 @@ object TestCt
         val mesh2ArgumentName = "t_mesh.argument"
         val meshCoordinatesName = "btex20_comp2.coordinates"
         val outputName = "collada ct.xml"
-        val exporter = ColladaExporter.exportFromFieldML _
+        val exporter = ColladaExporter.export3DFromFieldMLBind2Meshes _
 
         val region = UserRegion.fromFile( regionName, fileName )
 
