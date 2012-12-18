@@ -16,7 +16,8 @@ import scala.util.matching._
  */
 object ColladaExporter extends MeshExporter
 {
-    protected val rawXml = """<?xml version="1.0" encoding="utf-8"?>
+    override val startIndicesAt = 0
+    override val rawXml = """<?xml version="1.0" encoding="utf-8"?>
 <COLLADA version="1.4.0" xmlns="http://www.collada.org/2005/11/COLLADASchema">
     <library_effects>
         <effect id="$name_MaterialEffect" name="$name_MaterialEffect">
@@ -108,8 +109,8 @@ $polygonBlock
     </scene>
 </COLLADA>    		
     """
-    protected val openPolygon = "<p>"
-    protected val closePolygon = "</p>\n"
+    override val openPolygon = "<p>"
+    override val closePolygon = "</p>\n"
 
     def export2DFromFieldML(
       outputName : String, region : Region, discretisation : Int,

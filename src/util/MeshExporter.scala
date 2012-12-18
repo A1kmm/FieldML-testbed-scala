@@ -19,6 +19,8 @@ abstract class MeshExporter
     protected val rawXml : String
     protected val openPolygon : String
     protected val closePolygon : String
+    protected val wantVolumeMesh : Boolean = false
+    protected val startIndicesAt : Int = 0
 
     protected def fillInTemplate(outputName : String, xyzArray : StringBuilder,
                                  polygonBlock : StringBuilder, polygonCount : Int,
@@ -125,16 +127,33 @@ abstract class MeshExporter
                     val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 1 )
                     val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 0 )
                     polygonBlock.append(openPolygon)
-                    polygonBlock.append( " " + (nodeAtLowerXi1LowerXi2*2 ))
-                    polygonBlock.append( " " + (nodeAtLowerXi1UpperXi2*2 ))
-                    polygonBlock.append( " " + (nodeAtUpperXi1UpperXi2*2 ))
-                    polygonBlock.append( " " + (nodeAtUpperXi1LowerXi2*2 ))
-                    polygonBlock.append(closePolygon)
-                    polygonBlock.append(openPolygon)
-                    polygonBlock.append( " " + (nodeAtLowerXi1LowerXi2*2 + 1 ))
-                    polygonBlock.append( " " + (nodeAtLowerXi1UpperXi2*2 + 1 ))
-                    polygonBlock.append( " " + (nodeAtUpperXi1UpperXi2*2 + 1 ))
-                    polygonBlock.append( " " + (nodeAtUpperXi1LowerXi2*2 + 1))
+                    polygonBlock.append(" " + (startIndicesAt + nodeAtLowerXi1LowerXi2*2))
+                    polygonBlock.append(" " + (startIndicesAt + nodeAtLowerXi1UpperXi2*2))
+                    if (wantVolumeMesh)
+                    {
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1LowerXi2*2))
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1UpperXi2*2))
+                    }
+                    else
+                    {
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1UpperXi2*2))
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1LowerXi2*2))
+                      polygonBlock.append(closePolygon)
+                      polygonBlock.append(openPolygon)
+                    }
+                    polygonBlock.append(" " + (startIndicesAt + nodeAtLowerXi1LowerXi2*2 + 1))
+                    polygonBlock.append(" " + (startIndicesAt + nodeAtLowerXi1UpperXi2*2 + 1))
+
+                    if (wantVolumeMesh)
+                    {
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1LowerXi2*2 + 1))
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1UpperXi2*2 + 1))
+                    }
+                    else
+                    {
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1UpperXi2*2 + 1))
+                      polygonBlock.append(" " + (startIndicesAt + nodeAtUpperXi1LowerXi2*2 + 1))
+                    }
                     polygonBlock.append(closePolygon)
                 }
             }
@@ -144,7 +163,9 @@ abstract class MeshExporter
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount*2, vertexCount*2, xyzArrayCount*2)
+        fillInTemplate(outputName, xyzArray, polygonBlock,
+                       polygonCount * (if (wantVolumeMesh) 1 else 2),
+                       vertexCount*2, xyzArrayCount*2)
     }
 
     def export3DFromFieldMLBind2Meshes(
@@ -195,10 +216,10 @@ abstract class MeshExporter
                         val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 1 )
                         val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 0 )
                         polygonBlock.append(openPolygon)
-                        polygonBlock.append( " " + nodeAtLowerXi1LowerXi2 )
-                        polygonBlock.append( " " + nodeAtLowerXi1UpperXi2 )
-                        polygonBlock.append( " " + nodeAtUpperXi1UpperXi2 )
-                        polygonBlock.append( " " + nodeAtUpperXi1LowerXi2 )
+                        polygonBlock.append( " " + (startIndicesAt + nodeAtLowerXi1LowerXi2))
+                        polygonBlock.append( " " + (startIndicesAt + nodeAtLowerXi1UpperXi2))
+                        polygonBlock.append( " " + (startIndicesAt + nodeAtUpperXi1UpperXi2))
+                        polygonBlock.append( " " + (startIndicesAt + nodeAtUpperXi1LowerXi2))
                         polygonBlock.append(closePolygon)
                     }
                 }

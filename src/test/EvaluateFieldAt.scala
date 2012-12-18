@@ -12,7 +12,7 @@ import framework.datastore._
 import framework.value._
 import framework._
 import fieldml.jni.FieldmlApi._
-import util.ColladaExporter
+import util._
 import framework.region._
 import valuesource.ParameterEvaluatorValueSource
 import javax.imageio._
@@ -22,6 +22,10 @@ import java.awt.Color
 
 object EvaluateFieldAt
 {
+  sealed abstract class OutputFormat
+  case object FieldMLOutput extends OutputFormat
+  case object ColladaOutput extends OutputFormat
+
   def main( argv : Array[String] ) : Unit = {
     if (argv.size == 3) {
       println(argv(2))
@@ -36,7 +40,7 @@ object EvaluateFieldAt
       println("Usage: EvaluateFieldAt xmlFilePath region expression\r\n" +
               "expression: empty | bind name value expression | evaluate name expression\r\n" +
               "                  | evaluateImage filename outputEval valueEval coordEval\r\n" +
-              "                  | evaluateCollada3d filename outputMeshName discretisationPointsPerXiPerMesh meshArgumentInputEval nodalPosEval\r\n" +
+              "                  | evaluateMesh3d (collada|fieldml) filename outputMeshName discretisationPointsPerXiPerMesh meshArgumentInputEval nodalPosEval\r\n" +
               "name, region: dotted FieldML identifiers\r\n" +
               "value: A series of values (value production below) surrounded by []\r\n" +
               "value: meshValue int listOfDoubleValuesSpaceSeparated | ensembleValue int | continuousValue listOfDoubleValues")
@@ -112,11 +116,13 @@ object EvaluateFieldAt
               val rgb : Int = Color.HSBtoRGB(hue, 1.0f, 1.0f)
               bim.setRGB(x, y, rgb)
             }
-            ImageIO.write(bim, "PNG", new File(fn));
+            ImageIO.write(bim, "PNG", new File(fn))
           }
-          case EvaluateCollada3DAction(fn, outMeshName, discretisation, meshEvalName, rc3EvalName) => {
+          case EvaluateMesh3DAction(outformat, fn, outMeshName, discretisation, meshEvalName, rc3EvalName) => {
             val fw = new FileWriter(fn)
-            val res = ColladaExporter.export3DFromFieldML(outMeshName, region, discretisation, meshEvalName, rc3EvalName)
+            val res = (outformat match { case FieldMLOutput => SimpleFieldMLExporter
+                                         case ColladaOutput => ColladaExporter }).
+                      export3DFromFieldML(outMeshName, region, discretisation, meshEvalName, rc3EvalName)
             fw.write(res)
             fw.close()
           }
@@ -126,12 +132,12 @@ object EvaluateFieldAt
     ()
   }
 
-  abstract class FieldAction
+  sealed abstract class FieldAction
   case class BindParameterAction(bindArgumentName : String, bindValues : MakeValue) extends FieldAction
   case class EvaluateAction(evaluateField : String) extends FieldAction
   case class EvaluateImageAction(storeTo : String, inputEval : String, valueEval : String, coordEval : String) extends FieldAction
-  case class EvaluateCollada3DAction(storeTo : String, outMeshName : String, discretisation : Int, meshValueEval : String, rc3Eval : String) extends FieldAction
-  abstract class MakeValue
+  case class EvaluateMesh3DAction(outformat : OutputFormat, storeTo : String, outMeshName : String, discretisation : Int, meshValueEval : String, rc3Eval : String) extends FieldAction
+  sealed abstract class MakeValue
   case class MeshMakeValue(meshElement : Int, meshXIs : List[Double]) extends MakeValue
   case class EnsembleMakeValue(ensembleID : Int) extends MakeValue
   case class ContinuousMakeValue(values : List[Double]) extends MakeValue
@@ -139,7 +145,7 @@ object EvaluateFieldAt
   object ExpressionParser extends RegexParsers {
     def parse(s : String) = parseAll(expressionParser, s)
     def expressionParser = rep(actionParser)
-    def actionParser = bindActionParser | evaluateImageActionParser | evaluateCollada3DActionParser | evaluateActionParser
+    def actionParser = bindActionParser | evaluateImageActionParser | evaluateMesh3DActionParser | evaluateActionParser
     def bindActionParser = "bind" ~> (regex(new Regex("[A-Z|a-z][A-Z|a-z|\\.|0-9|_]*"))) ~ valueParser ^^
       (p => p match { case n~v => new BindParameterAction(n, v) })
     def evaluateActionParser = "evaluate" ~> commit(regex(new Regex("[A-Z|a-z][A-Z|a-z|\\.|0-9|_]*")) ^^
@@ -151,15 +157,16 @@ object EvaluateFieldAt
                                 regex(new Regex("[A-Z|a-z][A-Z|a-z|\\.|0-9|_]*")) ^^
                                 (p => p match { case fn~inputEval~valueEval~coordEval => new EvaluateImageAction(fn, inputEval, valueEval,
                                                                                                                  coordEval) }))
-    def evaluateCollada3DActionParser =
-      "evaluateCollada3d" ~>
-        commit(regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ~
+    def evaluateMesh3DActionParser =
+      "evaluateMesh3d" ~>
+        commit((("fieldml" ^^^ FieldMLOutput) | ("collada" ^^^ ColladaOutput)) ~
+               regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ~
                regex(new Regex("[A-Z|a-z|0-9|_|]+")) ~
                intParser ~
                regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ~
                regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ^^
-               (p => p match { case fn~outputMeshName~discretisation~inputEval~coordEval =>
-                 new EvaluateCollada3DAction(fn, outputMeshName, discretisation, inputEval, coordEval) }))
+               (p => p match { case t~fn~outputMeshName~discretisation~inputEval~coordEval =>
+                 new EvaluateMesh3DAction(t, fn, outputMeshName, discretisation, inputEval, coordEval) }))
 
     def valueParser = meshValueParser | ensembleValueParser | continuousValueParser
     def meshValueParser = "meshValue" ~> commit(intParser ~ rep(doubleParser) ^^
