@@ -15,16 +15,16 @@ object SimpleFieldMLExporter extends MeshExporter
   under local names -->
 <Import xlink:href="http://www.fieldml.org/resources/xml/0.5/FieldML_Library_0.5.xml" region="library">
   <ImportType localName="real.type" remoteName="real.1d" />
-  <ImportType localName="trilinearLagrange.parameters" remoteName="parameters.3d.unit.trilinearLagrange" />
-  <ImportType localName="trilinearLagrange.points" remoteName="parameters.3d.unit.trilinearLagrange.component" />
+  <ImportType localName="interp.parameters" remoteName="parameters.3d.unit.$interpolator" />
+  <ImportType localName="interp.points" remoteName="parameters.3d.unit.$interpolator.component" />
   <ImportType localName="coordinates.rc.3d.component" remoteName="coordinates.rc.3d.component" />
   <ImportType localName="coordinates.rc.3d" remoteName="coordinates.rc.3d" />
-  <ImportEvaluator localName="trilinearLagrange.parameters.argument" remoteName="parameters.3d.unit.trilinearLagrange.argument" />
-  <ImportEvaluator localName="trilinearLagrange.points.argument" remoteName="parameters.3d.unit.trilinearLagrange.component.argument" />
-  <ImportEvaluator localName="trilinearLagrange.interpolator" remoteName="interpolator.3d.unit.trilinearLagrange" />
+  <ImportEvaluator localName="interp.parameters.argument" remoteName="parameters.3d.unit.$interpolator.argument" />
+  <ImportEvaluator localName="interp.points.argument" remoteName="parameters.3d.unit.$interpolator.component.argument" />
+  <ImportEvaluator localName="interp.interpolator" remoteName="interpolator.3d.unit.$interpolator" />
   <ImportEvaluator localName="chart.3d.argument" remoteName="chart.3d.argument" />
   <ImportEvaluator localName="coordinates.rc.3d.component.argument" remoteName="coordinates.rc.3d.component.argument" />
-  <ImportEvaluator localName="shape.unit.cube" remoteName="shape.unit.cube"/>
+  <ImportEvaluator localName="$shape" remoteName="$shape"/>
 </Import>
 
 <!-- define $vertextCount-member ensemble to represent nodes 1..$vertexCount -->
@@ -46,7 +46,7 @@ object SimpleFieldMLExporter extends MeshExporter
   </Arguments>
 </ArgumentEvaluator>
 
-<!-- define a 3-D mesh type with $polygonCount elements of unit cube shape -->
+<!-- define a 3-D mesh type with $polygonCount elements... -->
 <MeshType name="$name.mesh.type">
   <Elements name="elements">
     <Members>
@@ -56,14 +56,14 @@ object SimpleFieldMLExporter extends MeshExporter
   <Chart name="chart">
     <Components name="$name.mesh.type.chart.component" count="3" />
   </Chart>
-  <Shapes evaluator="shape.unit.cube"/>
+  <Shapes evaluator="$shape"/>
 </MeshType>
 
 <!-- declare an argument of the mesh type. Evaluators varying only with this
   argument are interpreted as fields over the mesh -->
 <ArgumentEvaluator name="$name.mesh.argument" valueType="$name.mesh.type" />
 
-<!-- An inline data resource listing 8 corner nodes per element. Resources
+<!-- An inline data resource listing the node IDs for each element. Resources
   are just raw data; a ParameterEvaluator is needed to add semantic meaning -->
 <DataResource name="$name.nodes.connectivity.resource">
   <DataResourceDescription>
@@ -79,37 +79,37 @@ object SimpleFieldMLExporter extends MeshExporter
 </DataResource>
 
 <!-- define mapping from element*localnode to global index from ensemble
-  "$name.nodes.argument". "trilinearLagrange.points" are documented
+  "$name.nodes.argument". "interp.points" are documented
   as being the 8 corner points of a unit cube at chart locations:
   (0,0,0), (1,0,0), (0,1,0), (1,1,0), (0,0,1), (1,0,1), (0,1,1), (1,1,1) -->
-<ParameterEvaluator name="$name.trilinearLagrange.connectivity" valueType="$name.nodes">
+<ParameterEvaluator name="$name.interp.connectivity" valueType="$name.nodes">
   <DenseArrayData data="$name.nodes.connectivity.data">
     <DenseIndexes>
       <IndexEvaluator evaluator="$name.mesh.argument.elements" />
-      <IndexEvaluator evaluator="trilinearLagrange.points.argument" />
+      <IndexEvaluator evaluator="interp.points.argument" />
     </DenseIndexes>
   </DenseArrayData>
 </ParameterEvaluator>
 
 <!-- construct a vector of node parameters to pass on to
   "$name.trilinear.interpolator" -->
-<AggregateEvaluator name="$name.trilinearLagrange.parameters"
-    valueType="trilinearLagrange.parameters">
+<AggregateEvaluator name="$name.interp.parameters"
+    valueType="interp.parameters">
   <Bindings>
-    <BindIndex argument="trilinearLagrange.points.argument" indexNumber="1" />
-    <Bind argument="$name.nodes.argument" source="$name.trilinearLagrange.connectivity" />
+    <BindIndex argument="interp.points.argument" indexNumber="1" />
+    <Bind argument="$name.nodes.argument" source="$name.interp.connectivity" />
   </Bindings>
   <ComponentEvaluators default="$name.node.dofs.argument" />
 </AggregateEvaluator>
 
 <!-- define evaluator returning value of library trilinear Lagrange interpolator
   at the element chart location of mesh type "$name.mesh" and using parameters
-  from evaluator "$name.trilinearLagrange.parameters". -->
+  from evaluator "$name.interp.parameters". -->
 <ReferenceEvaluator name="$name.trilinear.interpolator"
-    evaluator="trilinearLagrange.interpolator" valueType="real.type">
+    evaluator="interp.interpolator" valueType="real.type">
   <Bindings>
     <Bind argument="chart.3d.argument" source="$name.mesh.argument.chart" />
-    <Bind argument="trilinearLagrange.parameters.argument" source="$name.trilinearLagrange.parameters" />
+    <Bind argument="interp.parameters.argument" source="$name.interp.parameters" />
   </Bindings>
 </ReferenceEvaluator>
 

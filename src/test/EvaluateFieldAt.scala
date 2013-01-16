@@ -40,7 +40,7 @@ object EvaluateFieldAt
       println("Usage: EvaluateFieldAt xmlFilePath region expression\r\n" +
               "expression: empty | bind name value expression | evaluate name expression\r\n" +
               "                  | evaluateImage filename outputEval valueEval coordEval\r\n" +
-              "                  | evaluateMesh3d (collada|fieldml) filename outputMeshName discretisationPointsPerXiPerMesh meshArgumentInputEval nodalPosEval\r\n" +
+              "                  | evaluateMesh3d (collada|fieldml) filename outputMeshName discretisationPointsPerXiPerMesh meshArgumentInputEval rcCoordOutputEvaluator\r\n" +
               "name, region: dotted FieldML identifiers\r\n" +
               "value: A series of values (value production below) surrounded by []\r\n" +
               "value: meshValue int listOfDoubleValuesSpaceSeparated | ensembleValue int | continuousValue listOfDoubleValues")

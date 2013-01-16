@@ -4,6 +4,8 @@ import framework.region._
 
 import framework.value.ContinuousValue
 import framework.value.Value
+import framework.valuesource.BooleanFunctionEvaluatorValueSource
+import framework.FmlException
 
 import fieldml.evaluator.ArgumentEvaluator
 import fieldml.evaluator.Evaluator
@@ -12,7 +14,7 @@ import fieldml.valueType.ContinuousType
 import scala.util.matching._
 
 /**
- * Very very simplistic FieldML-java to Collada converter.
+ * Convert a FieldML file to some other format by resampling.
  */
 abstract class MeshExporter
 {
@@ -23,8 +25,10 @@ abstract class MeshExporter
     protected val startIndicesAt : Int = 0
 
     protected def fillInTemplate(outputName : String, xyzArray : StringBuilder,
-                                 polygonBlock : StringBuilder, polygonCount : Int,
-                                 vertexCount : Int, xyzArrayCount : Int ) : String =
+                                 polygonBlock : StringBuilder, shape : String,
+                                 polygonCount : Int, nodeCount : Int,
+                                 vertexCount : Int, xyzArrayCount : Int,
+                                 interpolator : String) : String =
     {
         def replacements(m : Regex.Match) : String =
           {
@@ -35,6 +39,9 @@ abstract class MeshExporter
               case "vertexCount"   => ("" + vertexCount)
               case "xyzArray"      => xyzArray.toString()
               case "xyzArrayCount" => ("" + xyzArrayCount)
+              case "shape"         => shape
+              case "interpolator"  => interpolator
+              case "nodeCount"     => ("" + nodeCount)
               case _               => ""
             }
           }
@@ -82,21 +89,51 @@ abstract class MeshExporter
         }
     }
 
-    def export3DFromFieldML(
-      outputName : String,
-      region : Region, discretisation : Int,
-      meshName : String, evaluatorName : String
-    ) : String =
+    def getLibraryShapeName(meshEvaluator : Evaluator) : (String, Int) =
     {
-        val meshVariable : ArgumentEvaluator = region.getObject( meshName )
-        val meshType = meshVariable.valueType.asInstanceOf[MeshType]
-        val meshEvaluator : Evaluator = region.getObject( evaluatorName )
-        val elementCount = meshType.elementType.elementCount
+      if (!meshEvaluator.valueType.isInstanceOf[MeshType])
+        throw new FmlException("The 'mesh argument evaluator' " + meshEvaluator.name +
+                               " selected by the user does not have a mesh type. This could mean " +
+                               "that the user supplied an invalid value for the mesh argument evaluator, or " +
+                               "that the argumentEvaluator has the wrong valueType attribute.")
+      val meshType : MeshType = meshEvaluator.valueType.asInstanceOf[MeshType]
+      if (!meshType.shapes.isInstanceOf[BooleanFunctionEvaluatorValueSource])
+        throw new FmlException("The mesh argument evaluator'" + meshEvaluator.name +
+                               " has a shape that is not one of the built in boolean " +
+                               "evaluators. Unfortunately, this case is not " +
+                               "supported yet.")
+      val shapeEval : BooleanFunctionEvaluatorValueSource =
+        meshType.shapes.asInstanceOf[BooleanFunctionEvaluatorValueSource]
 
-        val xyzArray = new StringBuilder()
-        val polygonBlock = new StringBuilder()
+      // TODO: support 1d and 2d cases too...
+
+      // Build a signature from the shape function by evaluating at 3 points.
+      // TODO: Save this information rather than reconstructing it like this.
+      val sig = List((1, Array(0.0, 1.0, 1.0)), (2, Array(1.0, 0.0, 1.0)), (4, Array(1.0, 1.0, 0.0))).
+                 map(weightXis => if (shapeEval.function(weightXis._2)) weightXis._1 else 0).sum
+      sig match {
+        case 0 => ("shape.unit.tetrahedron", 4)
+        case 3 => ("shape.unit.wedge12", 6)
+        case 5 => ("shape.unit.wedge13", 6)
+        case 6 => ("shape.unit.wedge23", 6)
+        case 7 => ("shape.unit.cube", 8)
+        case _ => throw new FmlException("The mesh evaluator " + meshEvaluator.name +
+                                         " uses a built-in shape function that could not be identified.")
+      }
+    }
+
+    private def subdivide3D(
+        region : Region,
+        meshVariable : ArgumentEvaluator,
+        meshEvaluator : Evaluator,
+        polygonBlock : StringBuilder,
+        xyzArray : StringBuilder,
+        discretisation : Int,
+        elementCount : Int
+      ) = {
         for( elementNumber <- 1 to elementCount )
         {
+            System.out.println("elementNumber: " + elementNumber)
             for( i <- 0 to discretisation )
             {
                 for( j <- 0 to discretisation )
@@ -158,14 +195,102 @@ abstract class MeshExporter
                 }
             }
         }
+    }
 
-        val polygonCount = discretisation * discretisation * elementCount
-        val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
+    private def simplifyOnly3D(
+        region : Region,
+        meshVariable : ArgumentEvaluator,
+        meshEvaluator : Evaluator,
+        polygonBlock : StringBuilder,
+        xyzArray : StringBuilder,
+        shape : String,
+        elementCount : Int
+      ) = {
+      var usedNodes = Map[(Double, Double, Double),Int]()
+      var nextNodeID = 1
+      def idForNode(p : (Double, Double, Double)) : Int =
+        if (usedNodes.contains(p))
+          usedNodes(p)
+        else {
+          val newNodeID = nextNodeID
+          nextNodeID = nextNodeID + 1
+          usedNodes = usedNodes + ((p, newNodeID))
+          newNodeID
+        }
+
+      val z : Double = 0.0
+      val o : Double = 1.0
+      val nPoints = shape match {
+        case "shape.unit.cube"        => List((z,z,z),(z,z,o),(z,o,z),(z,o,o),
+                                              (o,z,z),(o,z,o),(o,o,z),(o,o,o)
+                                             )
+        case "shape.unit.tetrahedron" => List((z,z,z),(z,z,o),(z,o,z),
+                                              (o,z,z)
+                                             )
+        case "shape.unit.wedge12"     => List((z,z,z),(z,z,o),(z,o,z),(z,o,o),
+                                              (o,z,z),(o,z,o)
+                                             )
+        case "shape.unit.wedge13"     => List((z,z,z),(z,z,o),(z,o,z),(z,o,o),
+                                              (o,z,z),(o,o,z)
+                                             )
+        case "shape.unit.wedge23"     => List((z,z,z),(z,z,o),(z,o,z),
+                                              (o,z,z),(o,z,o),(o,o,z)
+                                             )
+      }
+      val pPerEl = nPoints.size
+
+      for (elementNumber <- 1 to elementCount) {
+        polygonBlock.append(openPolygon)
+        nPoints.foreach(p => {
+          region.bind(meshVariable, elementNumber, p._1, p._2, p._3)
+          polygonBlock.append(
+            region.evaluate(meshEvaluator) match {
+              case value : Some[ContinuousValue] =>
+                " " + idForNode((value.get.value(0), value.get.value(1), value.get.value(2)))
+              case _           => " 0"
+            })
+        })
+        polygonBlock.append(closePolygon)
+      }
+
+      (elementCount, nextNodeID - 1)
+    }
+
+    def export3DFromFieldML(
+      outputName : String,
+      region : Region, discretisation : Int,
+      meshName : String, evaluatorName : String
+    ) : String =
+    {
+        val meshVariable : ArgumentEvaluator = region.getObject( meshName )
+        val meshType = meshVariable.valueType.asInstanceOf[MeshType]
+        val meshEvaluator : Evaluator = region.getObject( evaluatorName )
+        val elementCount = meshType.elementType.elementCount
+
+        val (shape : String, nodeCount : Int) = getLibraryShapeName(meshVariable)
+
+        val xyzArray = new StringBuilder()
+        val polygonBlock = new StringBuilder()
+
+        if (shape != "shape.unit.cube" && discretisation != 1)
+          throw new FmlException("export3DFromFieldML: At present, only cubic meshes can " +
+                                 "be exported with discretisation (set discretisation to " +
+                                 "1 to avoid this error)");
+
+        val (polygonCount, vertexCount) =
+          if (discretisation == 1) {
+            simplifyOnly3D(region, meshVariable, meshEvaluator, polygonBlock, xyzArray, shape, elementCount)
+          } else {
+            subdivide3D(region, meshVariable, meshEvaluator, polygonBlock,
+                        xyzArray, discretisation, elementCount)
+            (discretisation * discretisation * elementCount,
+             2 * (discretisation + 1) * (discretisation + 1) * elementCount)
+          }
+
         val xyzArrayCount = vertexCount * 3
-
-        fillInTemplate(outputName, xyzArray, polygonBlock,
-                       polygonCount * (if (wantVolumeMesh) 1 else 2),
-                       vertexCount*2, xyzArrayCount*2)
+        fillInTemplate(outputName, xyzArray, polygonBlock, shape,
+                       polygonCount * (if (wantVolumeMesh) 1 else 2), nodeCount,
+                       vertexCount, xyzArrayCount, "trilinearLagrange")
     }
 
     def export3DFromFieldMLBind2Meshes(
@@ -180,6 +305,7 @@ abstract class MeshExporter
         val mesh2Type = mesh2Variable.valueType.asInstanceOf[MeshType]
         val element1Count = mesh1Type.elementType.elementCount
         val element2Count = mesh2Type.elementType.elementCount
+        val (shape : String, nodeCount : Int) = getLibraryShapeName(mesh1Variable)
 
         val xyzArray = new StringBuilder()
         val polygonBlock = new StringBuilder()
@@ -230,6 +356,8 @@ abstract class MeshExporter
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementNumber
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
+        fillInTemplate(outputName, xyzArray, polygonBlock, shape, polygonCount,
+                       nodeCount, vertexCount, xyzArrayCount,
+                       "trilinearLagrange")
     }
 }

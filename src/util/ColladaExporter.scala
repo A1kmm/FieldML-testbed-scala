@@ -164,7 +164,7 @@ $polygonBlock
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
+        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange")
     }
 
 
@@ -228,7 +228,7 @@ $polygonBlock
         val vertexCount = 3 * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
+        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange")
     }
 
 
@@ -287,7 +287,7 @@ $polygonBlock
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
+        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange")
     }
 
     def export1DFromFieldML(
@@ -349,6 +349,6 @@ $polygonBlock
         val vertexCount = ( discretisation + 1 ) * 2 * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, polygonCount, vertexCount, xyzArrayCount)
+        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange")
     }
 }
