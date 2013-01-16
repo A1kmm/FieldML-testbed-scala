@@ -48,11 +48,15 @@ object ExternalEvaluatorGenerator
             case "interpolator.2d.unit.biquadraticLagrange" => generateContinuousEvaluator( source, objectHandle, name )
             case "interpolator.3d.unit.triquadraticLagrange" => generateContinuousEvaluator( source, objectHandle, name )
             case "interpolator.2d.unit.bilinearSimplex" => generateContinuousEvaluator( source, objectHandle, name )
+            case "interpolator.3d.unit.triquadraticSimplex" => generateContinuousEvaluator( source, objectHandle, name )
+            case "interpolator.3d.unit.triquadraticSimplex.vtk" => generateContinuousEvaluator( source, objectHandle, name )
+            case "interpolator.3d.unit.triquadraticSimplex.zienkiewicz" => generateContinuousEvaluator( source, objectHandle, name )
             case "refinement.square.2x2.xi" => generateContinuousEvaluator( source, objectHandle, name )
             case "shape.unit.line" => generateBooleanEvaluator( source, objectHandle, name )
             case "shape.unit.square" => generateBooleanEvaluator( source, objectHandle, name )
             case "shape.unit.cube" => generateBooleanEvaluator( source, objectHandle, name )
             case "shape.unit.triangle" => generateBooleanEvaluator( source, objectHandle, name )
+            case "shape.unit.tetrahedron" => generateBooleanEvaluator( source, objectHandle, name )
             case "refinement.square.2x2.element" => generateEnsembleEvaluator( source, objectHandle, name )
             case "random.0d.equiprobable.tag" => generateEnsembleEvaluator( source, objectHandle, name )
             case _ => System.err.println( "Unknown external evaluator " + name ); return null
@@ -93,11 +97,20 @@ object ExternalEvaluatorGenerator
 
         val linearSimplexParamNames = Array[String](
             null,
-            null, //NYI
+            null,
             "parameters.2d.unit.bilinearSimplex.argument",
-            null //NYI
+            "parameters.3d.unit.trilinearSimplex.argument"
             )
         
+        val quadraticSimplexParamNames = Array[String](
+            null,
+            null,
+            "parameters.2d.unit.biquadraticSimplex.argument",
+            "parameters.3d.unit.triquadraticSimplex.argument"
+            )
+        val vtkSimplexParamName = "parameters.3d.unit.triquadraticSimplex.vtk.argument"
+        val zienkiewiczSimplexParamName = "parameters.3d.unit.triquadraticSimplex.zienkiewicz.argument"
+
         val booleanName = "boolean"
 
 
@@ -141,8 +154,20 @@ object ExternalEvaluatorGenerator
                                                                  identity (_ : Array[Double]))
             case "interpolator.3d.unit.triquadraticLagrange" => ( new QuadraticLagrange( 3 ).evaluate _, xiNames( 3 ), quadraticParamNames( 3 ),
                                                                  identity (_ : Array[Double]))
-            case "interpolator.2d.unit.bilinearSimplex" => ( new BilinearSimplex().evaluate _, xiNames( 2 ), linearSimplexParamNames( 2 ),
+            case "interpolator.2d.unit.bilinearSimplex" => ( new LinearSimplex().evaluate _, xiNames( 2 ), linearSimplexParamNames( 2 ),
                                                              identity (_ : Array[Double]))
+            case "interpolator.2d.unit.biquadraticSimplex" => ( new QuadraticSimplex(2).evaluate _, xiNames( 2 ), quadraticSimplexParamNames( 2 ),
+                                                               identity (_ : Array[Double]))
+            case "interpolator.3d.unit.trilinearSimplex" => ( new LinearSimplex().evaluate _, xiNames( 3 ), linearSimplexParamNames( 3 ),
+                                                              identity (_ : Array[Double]))
+            case "interpolator.3d.unit.triquadraticSimplex" => ( new QuadraticSimplex(3).evaluate _, xiNames( 3 ), quadraticSimplexParamNames( 3 ),
+                                                                identity (_ : Array[Double]))
+            case "interpolator.3d.unit.triquadraticSimplex.vtk" =>
+              (new QuadraticSimplex(3).evaluate _, xiNames( 3 ), vtkSimplexParamName,
+               reorder(Array(0,4,1,6,5,2,7,8,9,3)))
+            case "interpolator.3d.unit.triquadraticSimplex.zienkiewicz" =>
+              (new QuadraticSimplex(3).evaluate _, xiNames( 3 ), zienkiewiczSimplexParamName,
+               reorder(Array(0,4,1,5,7,2,6,9,8,3)))
             case "refinement.square.2x2.xi" => ( new GridRefinementXi(Array( 2, 2 ) ).evaluate _, xiNames( 2 ), xiNames( 2 ),
                                                  identity (_ : Array[Double]))
             case _ => System.err.println( "Unknown external evaluator " + name ); return null
@@ -184,7 +209,8 @@ object ExternalEvaluatorGenerator
         val fparams =
         name match
         {
-            case "shape.unit.triangle" => ( new Shape2DUnitTriangle().evaluate _, xiNames( 2 ) )
+            case "shape.unit.triangle" => ( new ShapeUnitSimplex(2).evaluate _, xiNames( 2 ) )
+            case "shape.unit.tetrahedron" => ( new ShapeUnitSimplex(3).evaluate _, xiNames( 3 ) )
             case "shape.unit.line" => ( new ShapeUnitLinear( 1 ).evaluate _, xiNames( 1 ) )
             case "shape.unit.square" => ( new ShapeUnitLinear( 2 ).evaluate _, xiNames( 2 ) )
             case "shape.unit.cube" => ( new ShapeUnitLinear( 3 ).evaluate _, xiNames( 3 ) )
