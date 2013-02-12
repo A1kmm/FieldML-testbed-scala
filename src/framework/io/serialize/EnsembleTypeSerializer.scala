@@ -52,7 +52,7 @@ object EnsembleTypeSerializer
     }
     
     
-    def extractElements( source : Deserializer, objectHandle : Int, ensemble : EnsembleType ) : Unit =
+    def extractElements[UserDofs](source : Deserializer[UserDofs], objectHandle : Int, ensemble : EnsembleType ) : Unit =
     {
         val entries = new Array[Int]( 3 )
 
@@ -106,7 +106,7 @@ object EnsembleTypeSerializer
     }
 
     
-    def extract( source : Deserializer, objectHandle : Int ) : EnsembleType = 
+    def extract[UserDofs]( source : Deserializer[UserDofs], objectHandle : Int ) : EnsembleType = 
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
         

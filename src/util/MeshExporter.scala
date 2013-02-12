@@ -4,7 +4,8 @@ import framework.region._
 
 import framework.value.ContinuousValue
 import framework.value.Value
-import framework.valuesource.BooleanFunctionEvaluatorValueSource
+import framework.value.MeshValue
+import framework.valuesource._
 import framework.FmlException
 
 import fieldml.evaluator.ArgumentEvaluator
@@ -48,48 +49,48 @@ abstract class MeshExporter
         """\$([A-Z|a-z]+)""".r.replaceAllIn(rawXml, replacements(_))
     }
 
-    protected def formatTriple(value : Option[Value]) : String =
+    protected def formatTriple(value : Value) : String =
     {
         value match
         {
-            case c : Some[ContinuousValue] =>
-              "\n" + c.get.value(0) + " " + c.get.value(1) + " " + c.get.value(2);
+            case c : ContinuousValue =>
+              "\n" + c.value(0) + " " + c.value(1) + " " + c.value(2);
             case _ => "\n0 0 0"
         }
     }
 
-    protected def formatPair(value : Option[Value], z : Double) : String =
+    protected def formatPair(value : Value, z : Double) : String =
     {
         value match
         {
-            case c : Some[ContinuousValue] =>  "\n" + c.get.value(0) + " " + c.get.value(1) + " " + z
+            case c : ContinuousValue =>  "\n" + c.value(0) + " " + c.value(1) + " " + z
             case _ => "\n0 0 0"
         }
     }
 
-    protected def formatPair(value : Option[Value], zValue : Option[Value]) : String =
+    protected def formatPair(value : Value, zValue : Value) : String =
     {
         value match
         {
-            case c : Some[ContinuousValue] => zValue match
+            case c : ContinuousValue => zValue match
             {
-                case d : Some[ContinuousValue] => "\n" + c.get.value(0) + " " + c.get.value(1) + " " + d.get.value(0)
+                case d : ContinuousValue => "\n" + c.value(0) + " " + c.value(1) + " " + d.value(0)
                 case _ => "\n0 0 0"
             }
             case _ => "\n0 0 0"
         }
     }
 
-    protected def formatSingle( value : Option[Value], y : Double, z : Double) : String =
+    protected def formatSingle( value : Value, y : Double, z : Double) : String =
     {
         value match
         {
-            case c : Some[ContinuousValue] =>  "\n" + c.get.value(0) + " " + y + " " + z;
+            case c : ContinuousValue =>  "\n" + c.value(0) + " " + y + " " + z;
             case _ => "\n0 0 0"
         }
     }
 
-    def getLibraryShapeName(meshEvaluator : Evaluator) : (String, Int) =
+    def getLibraryShapeName[A](meshEvaluator : ValueSource[A]) : (String, Int) =
     {
       if (!meshEvaluator.valueType.isInstanceOf[MeshType])
         throw new FmlException("The 'mesh argument evaluator' " + meshEvaluator.name +
@@ -97,13 +98,13 @@ abstract class MeshExporter
                                "that the user supplied an invalid value for the mesh argument evaluator, or " +
                                "that the argumentEvaluator has the wrong valueType attribute.")
       val meshType : MeshType = meshEvaluator.valueType.asInstanceOf[MeshType]
-      if (!meshType.shapes.isInstanceOf[BooleanFunctionEvaluatorValueSource])
+      if (!meshType.shapes.isInstanceOf[BooleanFunctionEvaluatorValueSource[A]])
         throw new FmlException("The mesh argument evaluator'" + meshEvaluator.name +
                                " has a shape that is not one of the built in boolean " +
                                "evaluators. Unfortunately, this case is not " +
                                "supported yet.")
-      val shapeEval : BooleanFunctionEvaluatorValueSource =
-        meshType.shapes.asInstanceOf[BooleanFunctionEvaluatorValueSource]
+      val shapeEval : BooleanFunctionEvaluatorValueSource[A] =
+        meshType.shapes.asInstanceOf[BooleanFunctionEvaluatorValueSource[A]]
 
       // TODO: support 1d and 2d cases too...
 
@@ -123,46 +124,46 @@ abstract class MeshExporter
     }
 
     private def subdivide3D(
-        region : Region,
-        meshVariable : ArgumentEvaluator,
-        meshEvaluator : Evaluator,
+        region : Region[MeshValue],
+        meshVariable : ArgumentEvaluatorValueSource[MeshValue],
+        meshEvaluator : ValueSource[MeshValue],
         polygonBlock : StringBuilder,
         xyzArray : StringBuilder,
         discretisation : Int,
         elementCount : Int
       ) = {
-        for( elementNumber <- 1 to elementCount )
+
+        region.bind(meshVariable, (x : MeshValue) => x)
+        val Some(f) = region.evaluate(meshEvaluator)
+
+        for (elementNumber <- 1 to elementCount)
         {
             System.out.println("elementNumber: " + elementNumber)
-            for( i <- 0 to discretisation )
+            for (i <- 0 to discretisation)
             {
-                for( j <- 0 to discretisation )
+                for (j <- 0 to discretisation)
                 {
                     val xi1 : Double = i * 1.0 / discretisation
                     val xi2 : Double = j * 1.0 / discretisation
                     
-                    region.bind(meshVariable, elementNumber, xi1, xi2, 0)
-                    
-                    val value = region.evaluate(meshEvaluator)
+                    val value = f(new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, xi1, xi2, 0))
                     xyzArray.append(formatTriple(value))
 
-                    region.bind(meshVariable, elementNumber, xi1, xi2, 1)
-                    
-                    val value2 = region.evaluate(meshEvaluator)
+                    val value2 = f(new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, xi1, xi2, 1))
                     xyzArray.append(formatTriple(value2))
                 }
             }
             xyzArray.append("\n")
 
-            val nodeOffsetOfElement = ( elementNumber - 1 ) * ( discretisation + 1 ) * ( discretisation + 1 )
-            for( i <- 0 until discretisation )
+            val nodeOffsetOfElement = (elementNumber - 1) * (discretisation + 1) * (discretisation + 1)
+            for (i <- 0 until discretisation)
             {
-                for( j <- 0 until discretisation )
+                for (j <- 0 until discretisation)
                 {
-                    val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 0 ) + ( j + 0 )
-                    val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 0 ) + ( j + 1 )
-                    val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 1 )
-                    val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 0 )
+                    val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 0) + (j + 0)
+                    val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 0) + (j + 1)
+                    val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 1) + (j + 1)
+                    val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 1) + (j + 0)
                     polygonBlock.append(openPolygon)
                     polygonBlock.append(" " + (startIndicesAt + nodeAtLowerXi1LowerXi2*2))
                     polygonBlock.append(" " + (startIndicesAt + nodeAtLowerXi1UpperXi2*2))
@@ -198,9 +199,9 @@ abstract class MeshExporter
     }
 
     private def simplifyOnly3D(
-        region : Region,
-        meshVariable : ArgumentEvaluator,
-        meshEvaluator : Evaluator,
+        region : Region[MeshValue],
+        meshVariable : ArgumentEvaluatorValueSource[MeshValue],
+        meshEvaluator : ValueSource[MeshValue],
         polygonBlock : StringBuilder,
         xyzArray : StringBuilder,
         shape : String,
@@ -239,14 +240,16 @@ abstract class MeshExporter
       }
       val pPerEl = nPoints.size
 
+      region.bind(meshVariable, (x : MeshValue) => x)
+      val Some(f) = region.evaluate(meshEvaluator)
+
       for (elementNumber <- 1 to elementCount) {
         polygonBlock.append(openPolygon)
         nPoints.foreach(p => {
-          region.bind(meshVariable, elementNumber, p._1, p._2, p._3)
           polygonBlock.append(
-            region.evaluate(meshEvaluator) match {
-              case value : Some[ContinuousValue] =>
-                " " + idForNode((value.get.value(0), value.get.value(1), value.get.value(2)))
+            f(new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, p._1, p._2, p._3)) match {
+              case value : ContinuousValue =>
+                " " + idForNode((value.value(0), value.value(1), value.value(2)))
               case _           => " 0"
             })
         })
@@ -258,16 +261,16 @@ abstract class MeshExporter
 
     def export3DFromFieldML(
       outputName : String,
-      region : Region, discretisation : Int,
+      region : Region[MeshValue], discretisation : Int,
       meshName : String, evaluatorName : String
     ) : String =
     {
-        val meshVariable : ArgumentEvaluator = region.getObject( meshName )
+        val meshVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject(meshName)
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
-        val meshEvaluator : Evaluator = region.getObject( evaluatorName )
+        val meshEvaluator : ValueSource[MeshValue] = region.getObject(evaluatorName)
         val elementCount = meshType.elementType.elementCount
 
-        val (shape : String, nodeCount : Int) = getLibraryShapeName(meshVariable)
+        val (shape : String, nodeCount : Int) = getLibraryShapeName[MeshValue](meshVariable)
 
         val xyzArray = new StringBuilder()
         val polygonBlock = new StringBuilder()
@@ -295,28 +298,31 @@ abstract class MeshExporter
 
     def export3DFromFieldMLBind2Meshes(
           outputName : String,
-          region : Region, discretisation : Int, evaluatorName : String,
-          mesh1Name : String, mesh2Name : String ) : String =
+          region : Region[(MeshValue,MeshValue)], discretisation : Int, evaluatorName : String,
+          mesh1Name : String, mesh2Name : String) : String =
     {
-        val mesh1Variable : ArgumentEvaluator = region.getObject( mesh1Name )
-        val mesh2Variable : ArgumentEvaluator = region.getObject( mesh2Name )
-        val meshEvaluator : Evaluator = region.getObject( evaluatorName )
+        val mesh1Variable : ArgumentEvaluatorValueSource[(MeshValue,MeshValue)] = region.getObject(mesh1Name)
+        val mesh2Variable : ArgumentEvaluatorValueSource[(MeshValue,MeshValue)] = region.getObject(mesh2Name)
+        val meshEvaluator : ValueSource[(MeshValue,MeshValue)] = region.getObject(evaluatorName)
         val mesh1Type = mesh1Variable.valueType.asInstanceOf[MeshType]
         val mesh2Type = mesh2Variable.valueType.asInstanceOf[MeshType]
         val element1Count = mesh1Type.elementType.elementCount
         val element2Count = mesh2Type.elementType.elementCount
-        val (shape : String, nodeCount : Int) = getLibraryShapeName(mesh1Variable)
+        val (shape : String, nodeCount : Int) = getLibraryShapeName[(MeshValue,MeshValue)](mesh1Variable)
+        region.bind(mesh1Variable, (x : (MeshValue, MeshValue)) => x._1)
+        region.bind(mesh2Variable, (x : (MeshValue, MeshValue)) => x._2)
+        val Some(f) = region.evaluate(meshEvaluator)
 
         val xyzArray = new StringBuilder()
         val polygonBlock = new StringBuilder()
         var elementNumber = 0
-        for( element1Number <- 1 to element1Count )
+        for (element1Number <- 1 to element1Count)
         {
-            for( element2Number <- 1 to element2Count )
+            for (element2Number <- 1 to element2Count)
             {
-                for( i <- 0 to discretisation )
+                for (i <- 0 to discretisation)
                 {
-                    for( j <- 0 to discretisation )
+                    for (j <- 0 to discretisation)
                     {
                         val xi1 : Double = i * 1.0 / discretisation
                         val xi2 : Double = j * 1.0 / discretisation
@@ -324,7 +330,8 @@ abstract class MeshExporter
                         region.bind(mesh1Variable, element1Number, xi1)
                         region.bind(mesh2Variable, element2Number, xi2)
 
-                        val value = region.evaluate(meshEvaluator)
+                        val value = f((new MeshValue(mesh1Type, element1Number, xi1), 
+                                       new MeshValue(mesh2Type, element2Number, xi2)))
                         xyzArray.append(formatTriple(value))
                     }
                 }
@@ -332,15 +339,15 @@ abstract class MeshExporter
 
                 elementNumber = elementNumber + 1
 
-                val nodeOffsetOfElement = ( elementNumber - 1 ) * ( discretisation + 1 ) * ( discretisation + 1 )
-                for( i <- 0 until discretisation )
+                val nodeOffsetOfElement = (elementNumber - 1) * (discretisation + 1) * (discretisation + 1)
+                for (i <- 0 until discretisation)
                 {
-                    for( j <- 0 until discretisation )
+                    for (j <- 0 until discretisation)
                     {
-                        val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 0 ) + ( j + 0 )
-                        val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 0 ) + ( j + 1 )
-                        val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 1 )
-                        val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 0 )
+                        val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 0) + (j + 0)
+                        val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 0) + (j + 1)
+                        val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 1) + (j + 1)
+                        val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 1) + (j + 0)
                         polygonBlock.append(openPolygon)
                         polygonBlock.append( " " + (startIndicesAt + nodeAtLowerXi1LowerXi2))
                         polygonBlock.append( " " + (startIndicesAt + nodeAtLowerXi1UpperXi2))
@@ -353,7 +360,7 @@ abstract class MeshExporter
         }
 
         val polygonCount = discretisation * discretisation * elementNumber
-        val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementNumber
+        val vertexCount = (discretisation + 1) * (discretisation + 1) * elementNumber
         val xyzArrayCount = vertexCount * 3
 
         fillInTemplate(outputName, xyzArray, polygonBlock, shape, polygonCount,

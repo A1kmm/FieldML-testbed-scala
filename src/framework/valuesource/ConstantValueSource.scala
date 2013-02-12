@@ -7,9 +7,9 @@ import framework.value.Value
 import framework.Context
 import framework.EvaluationState
 
-class ConstantValueSource( val value : Value )
-    extends Evaluator( "Constant(" + value.toString + ")", value.vType )
-    with ValueSource
+class ConstantValueSource[UserDofs](val value : Value)
+    extends Evaluator[ValueSource[UserDofs]]("Constant(" + value.toString + ")", value.vType)
+    with ValueSource[UserDofs]
 {
     override def variables = None
     
@@ -20,7 +20,7 @@ class ConstantValueSource( val value : Value )
     }
     
     
-    private val _value = Some( value )
+    private val _value = Some((_ : UserDofs) => value)
     
-    override def evaluate( state : EvaluationState ) : Option[Value] = _value
+    override def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => Value] = _value
 }

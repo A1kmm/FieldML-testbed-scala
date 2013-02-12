@@ -8,44 +8,43 @@ import framework.value._
 
 import framework.EvaluationState
 
-class RandomEvaluator( val randomArgument : ArgumentEvaluator, valueType : EnsembleType )
-    extends Evaluator( "random.0d.equiprobable", valueType )
-    with ValueSource
+class RandomEvaluator[UserDofs](val randomArgument : ValueSource[UserDofs], valueType : EnsembleType)
+    extends Evaluator[ValueSource[UserDofs]]("random.0d.equiprobable", valueType)
+    with ValueSource[UserDofs]
 {
     def variables = List()
     
-    var cache : Option[Value] = None
+    var number : Option[Int] = None
 
-    def isEventuallyUnbound( state : EvaluationState, arg : ArgumentEvaluator ) : Boolean =
+    def isEventuallyUnbound(state : EvaluationState[UserDofs], arg : ValueSource[UserDofs]) : Boolean =
     {
-      val bind = state.getBind( arg )
+      val bind : Option[ValueSource[UserDofs]] = state.getBind(arg)
       bind match {
-        case Some(a : ArgumentEvaluator) => isEventuallyUnbound(state, a)
+        case Some(a : ArgumentEvaluator[ValueSource[UserDofs]]) => isEventuallyUnbound(state, a)
         case Some(_) => false
         case None => true
       }
     }
 
-    def evaluate( state : EvaluationState ) : Option[Value] =
+    override def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => Value] =
     {
-      evaluateForType( state, valueType)
+      evaluateForType(state, valueType)
     }
 
-    def evaluateForType( state : EvaluationState,
-                         forType : ValueType ) : Option[Value] =
+    def evaluateForType(state : EvaluationState[UserDofs], forType : ValueType) : Option[UserDofs => Value] =
     {
-      cache match {
-        case None => {
-          cache = if (isEventuallyUnbound( state, randomArgument )) {
-            val number = math.abs(Random.nextInt()) % forType.asInstanceOf[EnsembleType].elementCount
-            Some(EnsembleValue.apply( forType.asInstanceOf[EnsembleType],  number ))
-          } else {
-            println("Argument appears bound; random tag is identity function.");
-            randomArgument.evaluate( state )
+      if (!isEventuallyUnbound(state, randomArgument)) {
+        println("Argument appears bound; random tag is identity function.")
+        randomArgument.evaluate(state)
+      } else {
+        val numv = (number match {
+          case None => {
+            number = Some(math.abs(Random.nextInt()) % forType.asInstanceOf[EnsembleType].elementCount)
+            number.get
           }
-          cache
-        }
-        case v@(Some(_)) => v
+          case Some(numv) => numv
+        })
+        Some((u : UserDofs) => EnsembleValue.apply(forType.asInstanceOf[EnsembleType], numv))
       }
     }
 }

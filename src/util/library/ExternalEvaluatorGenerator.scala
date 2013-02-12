@@ -21,8 +21,8 @@ import util._
 
 object ExternalEvaluatorGenerator
 {
-    def generateExternalEvaluator( source : Deserializer, objectHandle : Int ) :
-        Evaluator =
+    def generateExternalEvaluator[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) :
+        ValueSource[UserDofs] =
     {
         val name = Fieldml_GetObjectDeclaredName( source.fmlHandle, objectHandle )
         val objectType = Fieldml_GetObjectType( source.fmlHandle, objectHandle )
@@ -64,8 +64,8 @@ object ExternalEvaluatorGenerator
     }
     
     
-    private def generateContinuousEvaluator( source : Deserializer, objectHandle : Int, name : String ) :
-        Evaluator =
+    private def generateContinuousEvaluator[UserDofs](source : Deserializer[UserDofs], objectHandle : Int, name : String) :
+        ValueSource[UserDofs] =
     {
         val evaluatorType : ContinuousType = source.getContinuousType( Fieldml_GetValueType( source.fmlHandle, objectHandle ) )
         val xiNames = Array[String](
@@ -195,8 +195,8 @@ object ExternalEvaluatorGenerator
     }
     
     
-    private def generateBooleanEvaluator( source : Deserializer, objectHandle : Int, name : String ) :
-        Evaluator =
+    private def generateBooleanEvaluator[UserDofs]( source : Deserializer[UserDofs], objectHandle : Int, name : String ) :
+        ValueSource[UserDofs] =
     {
         val evaluatorType : BooleanType = source.getBooleanType( Fieldml_GetValueType( source.fmlHandle, objectHandle ) )
         val xiNames = Array[String](
@@ -229,17 +229,18 @@ object ExternalEvaluatorGenerator
         return new BooleanFunctionEvaluatorValueSource( localName, fparams._1, xiVariable, evaluatorType )
     }
 
-    private def generateEnsembleEvaluator( source : Deserializer, objectHandle : Int, name : String ) :
-        Evaluator =
+    private def generateEnsembleEvaluator[UserDofs](source : Deserializer[UserDofs], objectHandle : Int, name : String) :
+        ValueSource[UserDofs] =
     {
-        val evaluatorType : EnsembleType = source.getEnsembleType( Fieldml_GetValueType( source.fmlHandle, objectHandle ) )
+        val evaluatorType : EnsembleType = source.getEnsembleType(Fieldml_GetValueType(source.fmlHandle, objectHandle))
         
-            if( name == "random.0d.equiprobable.tag" )
+            if (name == "random.0d.equiprobable.tag")
             {
-                val evt : ArgumentEvaluator = source.getArgumentEvaluator( Fieldml_GetObjectByDeclaredName( source.fmlHandle,
-                                                                                       "random.0d.equiprobable.argument" ) )
-                                                 .asInstanceOf[ArgumentEvaluator]
-                return new RandomEvaluator( evt, evaluatorType )
+                val evt : ArgumentEvaluatorValueSource[UserDofs] =
+                  source.getArgumentEvaluator(Fieldml_GetObjectByDeclaredName(source.fmlHandle,
+                                                                              "random.0d.equiprobable.argument"))
+                    .asInstanceOf[ArgumentEvaluatorValueSource[UserDofs]]
+                return new RandomEvaluator(evt, evaluatorType)
             }
 
             val xiNames = Array[String](
@@ -252,7 +253,7 @@ object ExternalEvaluatorGenerator
             val fparams =
             name match
             {
-                case "refinement.square.2x2.element" => ( new GridRefinementElement( Array( 2, 2 ) ).evaluate _, xiNames( 2 ) )
+                case "refinement.square.2x2.element" => (new GridRefinementElement(Array(2, 2)).evaluate _, xiNames(2))
                 case _ => System.err.println( "Unknown external evaluator " + name ); return null
             }
             

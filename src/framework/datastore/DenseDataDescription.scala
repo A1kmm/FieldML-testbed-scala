@@ -9,16 +9,22 @@ import fieldml.valueType.EnsembleType
 
 import framework.value.Value
 
-class DenseDataDescription( valueType : ValueType, val denseOrders : Array[Array[Int]], val denseIndexes : Array[Evaluator] )
-    extends DataDescription( valueType )
-{
-    def this( valueType : ValueType, denseIndexes : Array[Evaluator] ) =
-    {
-        this( valueType, denseIndexes.map( _.valueType.asInstanceOf[EnsembleType].elementSet.toArray ), denseIndexes )
-    }
-    
+import scala.reflect._
 
-    override val indexEvaluators : Array[Evaluator] = Array.concat( denseIndexes )
+class DenseDataDescription[EvType <: Evaluator[EvType]](
+  valueType : ValueType,
+  val denseOrders : Array[Array[Int]],
+  val denseIndexes : Seq[EvType] /* This is a Seq to work around https://issues.scala-lang.org/browse/SI-7116 */
+)
+    (implicit tag: ClassTag[EvType])
+    extends DataDescription[EvType](valueType)
+{
+    def this(valueType : ValueType, denseIndexes : Seq[EvType])(implicit tag: ClassTag[EvType]) =
+    {
+        this(valueType, denseIndexes.map(_.valueType.asInstanceOf[EnsembleType].elementSet.toArray).toArray, denseIndexes)
+    }
+
+    override val indexEvaluators : Seq[EvType] = Seq.concat(denseIndexes)
     
     private val counts = indexEvaluators.map( _.valueType.asInstanceOf[EnsembleType].elementSet.size )
     

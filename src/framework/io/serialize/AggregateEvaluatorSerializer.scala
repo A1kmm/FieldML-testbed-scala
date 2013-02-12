@@ -7,11 +7,11 @@ import util.exception._
 import fieldml.jni.FieldmlApi._
 import fieldml.jni.FieldmlApiConstants._
 
-import framework.valuesource.AggregateEvaluatorValueSource
+import framework.valuesource._
 
 object AggregateEvaluatorSerializer
 {
-    def insert( handle : Int, evaluator : AggregateEvaluator ) : Unit =
+    def insert[UserDofs]( handle : Int, evaluator : AggregateEvaluatorValueSource[UserDofs] ) : Unit =
     {
         val indexHandle = GetNamedObject( handle, evaluator.indexBinds( 1 ).name )
         val valueHandle = GetNamedObject( handle, evaluator.valueType.name )
@@ -35,36 +35,36 @@ object AggregateEvaluatorSerializer
     }
 
     
-    def extract( source : Deserializer, objectHandle : Int ) : AggregateEvaluator =
+    def extract[UserDofs]( source : Deserializer[UserDofs], objectHandle : Int ) : AggregateEvaluatorValueSource[UserDofs] =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
 
         val typeHandle = Fieldml_GetValueType( source.fmlHandle, objectHandle )
         val valueType = source.getContinuousType( typeHandle )
         
-        val aggEval = new AggregateEvaluatorValueSource( name, valueType )
+        val aggEval = new AggregateEvaluatorValueSource[UserDofs](name, valueType)
         
         val indexEval = Fieldml_GetIndexEvaluator( source.fmlHandle, objectHandle, 1 )
-        aggEval.bind_index( 1 -> source.getArgumentOrSubtypeEvaluator( indexEval ) )
+        aggEval.bind_index(1 -> source.getArgumentOrSubtypeEvaluator(indexEval))
         
-        val defaultEval = Fieldml_GetDefaultEvaluator( source.fmlHandle, objectHandle )
-        if( defaultEval != FML_INVALID_HANDLE )
+        val defaultEval = Fieldml_GetDefaultEvaluator(source.fmlHandle, objectHandle)
+        if(defaultEval != FML_INVALID_HANDLE)
         {
-            aggEval.setDefault( source.getEvaluator( defaultEval ) )
+            aggEval.setDefault(source.getEvaluator(defaultEval))
         }
         
-        val evalCount = Fieldml_GetEvaluatorCount( source.fmlHandle, objectHandle )
-        for( i <- 1 to evalCount )
+        val evalCount = Fieldml_GetEvaluatorCount(source.fmlHandle, objectHandle)
+        for(i <- 1 to evalCount)
         {
-            val element = Fieldml_GetEvaluatorElement( source.fmlHandle, objectHandle, i )
-            val evaluator = Fieldml_GetEvaluator( source.fmlHandle, objectHandle, i )
-            if( ( element >= 0 ) && ( evaluator != FML_INVALID_HANDLE ) )
+            val element = Fieldml_GetEvaluatorElement(source.fmlHandle, objectHandle, i)
+            val evaluator = Fieldml_GetEvaluator(source.fmlHandle, objectHandle, i)
+            if((element >= 0) && (evaluator != FML_INVALID_HANDLE))
             {
-                aggEval.map( element -> source.getEvaluator( evaluator ) )
+                aggEval.map(element -> source.getEvaluator(evaluator))
             }
         }
         
-        for( b <- GetBinds( source, objectHandle ) ) aggEval.bind( b )
+        for (b <- GetBinds[UserDofs](source, objectHandle)) aggEval.bind(b)
         
         aggEval
     }

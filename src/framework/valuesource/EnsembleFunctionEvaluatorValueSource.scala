@@ -7,8 +7,9 @@ import framework.value.Value
 import framework.EnsembleFunctionEvaluator
 import framework.EvaluationState
 
-class EnsembleFunctionEvaluatorValueSource( name : String, function : ( Array[Double] ) => Int, var1 : Evaluator, valueType : EnsembleType )
-    extends EnsembleFunctionEvaluator( name, function, var1, valueType )
-    with ValueSource
+class EnsembleFunctionEvaluatorValueSource[UserDofs](name : String, function : (Array[Double]) => Int, var1 : ValueSource[UserDofs],
+                                                     valueType : EnsembleType)
+    extends EnsembleFunctionEvaluator(name, function, var1, valueType)
+    with ValueSource[UserDofs]
 {
 }

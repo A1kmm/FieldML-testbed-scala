@@ -1,7 +1,7 @@
 package framework.region
 
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Map
+import scala.collection.mutable.HashMap
 
 import framework.io.serialize._
 
@@ -24,8 +24,8 @@ import util._
 import util.library._
 import util.exception._
 
-class UserRegion private( name : String, val imports : Array[Pair[String, String]] )
-    extends Region( name )
+class UserRegion[UserDofs] private( name : String, val imports : Array[Pair[String, String]] )
+    extends Region[UserDofs]( name )
 {
     //Used for serialization, which must be order-sensitive.
     private val objectList = ArrayBuffer[FieldmlObject]()
@@ -113,28 +113,28 @@ class UserRegion private( name : String, val imports : Array[Pair[String, String
     }
     
     
-    def createContinuousFunctionEvaluator( name : String, function : ( Array[Double], Array[Double] ) => Array[Double], var1 : ArgumentEvaluator, var2 : ArgumentEvaluator, valueType : ContinuousType ) : Evaluator =
+    def createContinuousFunctionEvaluator(name : String, function : (Array[Double], Array[Double]) => Array[Double], var1 : ArgumentEvaluatorValueSource[UserDofs], var2 : ArgumentEvaluatorValueSource[UserDofs], valueType : ContinuousType) : ValueSource[UserDofs] =
     {
-        val evaluator = new ContinuousFunctionEvaluatorValueSource( name, function, var1, var2, valueType ) 
+        val evaluator = new ContinuousFunctionEvaluatorValueSource(name, function, var1, var2, valueType)
 
-        put( evaluator )
+        put(evaluator)
         
         evaluator
     }
     
     
-    def createReferenceEvaluator( name : String, refEvaluatorName : String, refRegion : Region ) : ReferenceEvaluator =
+    def createReferenceEvaluator(name : String, refEvaluatorName : String, refRegion : Region[UserDofs]) : ReferenceEvaluatorValueSource[UserDofs] =
     {
-        val refEvaluator : Evaluator = refRegion.getObject( refEvaluatorName )
-        val evaluator = new ReferenceEvaluatorValueSource( name, refEvaluator, refEvaluator.valueType )
+        val refEvaluator : ValueSource[UserDofs] = refRegion.getObject( refEvaluatorName )
+        val evaluator = new ReferenceEvaluatorValueSource[UserDofs](name, refEvaluator, refEvaluator.valueType)
         
-        put( evaluator )
+        put(evaluator)
         
         evaluator
     }
     
     
-    def createPiecewiseEvaluator( name : String, index : Evaluator, valueType : ValueType ) : PiecewiseEvaluator =
+    def createPiecewiseEvaluator(name : String, index : ValueSource[UserDofs], valueType : ValueType) : PiecewiseEvaluatorValueSource[UserDofs] =
     {
         val evaluator = new PiecewiseEvaluatorValueSource( name, valueType, index )
         
@@ -144,9 +144,9 @@ class UserRegion private( name : String, val imports : Array[Pair[String, String
     }
     
     
-    def createAggregateEvaluator( name : String, valueType : ContinuousType ) : AggregateEvaluator =
+    def createAggregateEvaluator(name : String, valueType : ContinuousType) : AggregateEvaluatorValueSource[UserDofs] =
     {
-        val evaluator = new AggregateEvaluatorValueSource( name, valueType )
+        val evaluator = new AggregateEvaluatorValueSource[UserDofs]( name, valueType )
         
         put( evaluator )
         
@@ -154,12 +154,14 @@ class UserRegion private( name : String, val imports : Array[Pair[String, String
     }
     
     
-    def createParameterEvaluator( name : String, valueType : ValueType, data : DataSource, description : DataDescription ) : ParameterEvaluator =
+    def createParameterEvaluator(name : String, valueType : ValueType,
+                                 data : DataSource,
+                                 description : DataDescription[ValueSource[UserDofs]]) : ParameterEvaluatorValueSource[UserDofs] =
     {
-        val store = new DataStore( data, description )
-        val evaluator = new ParameterEvaluatorValueSource( name, valueType, store )
+        val store = new DataStore(data, description)
+        val evaluator = new ParameterEvaluatorValueSource[UserDofs](name, valueType, store)
         
-        put( evaluator )
+        put(evaluator)
         
         evaluator
     }
@@ -175,9 +177,9 @@ class UserRegion private( name : String, val imports : Array[Pair[String, String
     }
     
     
-    def createArgumentEvaluator( name : String, valueType : ValueType ) : ArgumentEvaluator =
+    def createArgumentEvaluator( name : String, valueType : ValueType ) : ArgumentEvaluatorValueSource[UserDofs] =
     {
-        val evaluator = new ArgumentEvaluatorValueSource( name, valueType )
+        val evaluator = new ArgumentEvaluatorValueSource[UserDofs]( name, valueType )
         
         put( evaluator )
         
@@ -185,7 +187,7 @@ class UserRegion private( name : String, val imports : Array[Pair[String, String
     }
     
     
-    def createSubtypeEvaluator( baseEvaluator : Evaluator, subname : String ) : SubtypeEvaluator =
+    def createSubtypeEvaluator( baseEvaluator : ValueSource[UserDofs], subname : String ) : SubtypeEvaluatorValueSource[UserDofs] =
     {
         val subtype = baseEvaluator.valueType match
         {
@@ -196,7 +198,7 @@ class UserRegion private( name : String, val imports : Array[Pair[String, String
             }
             case _ => throw new FmlInvalidObjectException( "Evaluator " + baseEvaluator + " does not have a structured value type" )
         }
-        val evaluator = new SubtypeEvaluatorValueSource( baseEvaluator, subname )
+        val evaluator = new SubtypeEvaluatorValueSource[UserDofs](baseEvaluator, subname)
         
         put( evaluator )
         
@@ -222,12 +224,12 @@ class UserRegion private( name : String, val imports : Array[Pair[String, String
         case d : EnsembleType => d.insert( handle, d )
         case d : ContinuousType => d.insert( handle, d )
         case d : MeshType => { d.insert( handle, d ); meshList += d }
-        case e : ArgumentEvaluator => e.insert( handle, e )
-        case e : PiecewiseEvaluator => e.insert( handle, e )
-        case e : ParameterEvaluator => e.insert( handle, e )
-        case e : ReferenceEvaluator => e.insert( handle, e )
-        case e : AggregateEvaluator => e.insert( handle, e )
-        case e : ConstantEvaluator => e.insert( handle, e )
+        case e : ArgumentEvaluatorValueSource[UserDofs] => e.insert(handle, e)
+        case e : PiecewiseEvaluatorValueSource[UserDofs] => e.insert(handle, e)
+        case e : ParameterEvaluatorValueSource[UserDofs] => e.insert(handle, e)
+        case e : ReferenceEvaluatorValueSource[UserDofs] => e.insert(handle, e)
+        case e : AggregateEvaluatorValueSource[UserDofs] => e.insert(handle, e)
+        case e : ConstantEvaluatorValueSource[UserDofs] => e.insert(handle, e)
         case unknown => println( "Cannot yet serialize " + unknown )
         }
         )
@@ -258,7 +260,7 @@ object UserRegion
     }
 
     
-    private def importObjects( fmlHandle : Int, region : UserRegion ) : Unit =
+    private def importObjects[UserDofs]( fmlHandle : Int, region : UserRegion[UserDofs] ) : Unit =
     {
         val source = new Deserializer( fmlHandle )
         for(
@@ -280,7 +282,7 @@ object UserRegion
     }
     
     
-    def fromFile( name : String, filename : String ) : Region =
+    def fromFile[UserDofs]( name : String, filename : String ) : Region[UserDofs] =
     {
         val fmlHandle = Fieldml_CreateFromFile( filename )
         
@@ -300,7 +302,7 @@ object UserRegion
             s2 = builder2.toString )
             yield Pair( s1, s2 )
         
-        val region = new UserRegion( name, imports.toArray )
+        val region = new UserRegion[UserDofs]( name, imports.toArray )
         
         importObjects( fmlHandle, region )
         
@@ -310,9 +312,9 @@ object UserRegion
     }
     
     
-    def fromScratch( name : String, imports : Pair[String, String]* ) : UserRegion =
+    def fromScratch[UserDofs]( name : String, imports : Pair[String, String]* ) : UserRegion[UserDofs] =
     {
-        val region = new UserRegion( name, imports.toArray[Pair[String, String]] )
+        val region = new UserRegion[UserDofs]( name, imports.toArray[Pair[String, String]] )
         val fmlHandle = Fieldml_Create( "", name )
         
         val importId = Fieldml_AddImportSource( fmlHandle, "http://www.fieldml.org/resources/xml/0.4/fieldml_library.xml", "library" )

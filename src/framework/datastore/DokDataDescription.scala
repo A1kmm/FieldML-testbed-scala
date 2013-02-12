@@ -8,19 +8,17 @@ import fieldml.valueType.ValueType
 import fieldml.valueType.EnsembleType
 
 import framework.value.Value
+import scala.reflect.ClassTag
 
-class DokDataDescription( valueType : ValueType, val denseOrders : Array[Array[Int]], val denseIndexes : Array[Evaluator], val sparseIndexes : Array[Evaluator] )
-    extends DataDescription( valueType )
+class DokDataDescription[EvType <: Evaluator[EvType]]( valueType : ValueType, val denseOrders : Array[Array[Int]], val denseIndexes : Seq[EvType], val sparseIndexes : Seq[EvType] )(implicit tag: ClassTag[EvType])
+    extends DataDescription[EvType]( valueType )
 {
-    def this( valueType : ValueType, denseIndexes : Array[Evaluator], sparseIndexes : Array[Evaluator] ) =
-    {
-        this( valueType, denseIndexes.map( _.valueType.asInstanceOf[EnsembleType].elementSet.toArray ), denseIndexes, sparseIndexes )
-    }
-    
+    def this(valueType : ValueType, denseIndexes : Seq[EvType], sparseIndexes : Seq[EvType])(implicit tag: ClassTag[EvType]) =
+      this(valueType, denseIndexes.map(_.valueType.asInstanceOf[EnsembleType].elementSet.toArray).toArray, denseIndexes, sparseIndexes)
 
-    override val indexEvaluators : Array[Evaluator] = Array.concat( sparseIndexes, denseIndexes )
+    override val indexEvaluators : Seq[EvType] = Seq.concat(sparseIndexes, denseIndexes)
     
-    private val counts = indexEvaluators.map( _.valueType.asInstanceOf[EnsembleType].elementSet.size )
+    private val counts = indexEvaluators.map(_.valueType.asInstanceOf[EnsembleType].elementSet.size)
     
     private val isQuick = calcIsQuick
         
@@ -28,9 +26,9 @@ class DokDataDescription( valueType : ValueType, val denseOrders : Array[Array[I
     {
         var count : Long = 1
         
-        for( e <- 1 until indexEvaluators.size )
+        for (e <- 1 until indexEvaluators.size)
         {
-            if( count * counts(e) > Int.MaxValue )
+            if (count * counts(e) > Int.MaxValue)
             {
                 return false
             }
@@ -47,26 +45,26 @@ class DokDataDescription( valueType : ValueType, val denseOrders : Array[Array[I
     private val qMap = Map[Int, Value]()
 
 
-    private def getQHash( indexes : Array[Int] ) : Int =
+    private def getQHash(indexes : Array[Int]) : Int =
     {
         var key = 0
-        for( i <- 0 until counts.size )
+        for (i <- 0 until counts.size)
         {
-            key *= counts( i )
-            key += indexes( i )
+            key *= counts(i)
+            key += indexes(i)
         }
         
         return key
     }
     
 
-    private def findKey( indexes : Array[Int] ) : Option[Array[Int]] =
+    private def findKey(indexes : Array[Int]) : Option[Array[Int]] =
     {
-        for( k <- map.keys )
+        for (k <- map.keys)
         {
-            if( k.sameElements( indexes ) )
+            if (k.sameElements(indexes))
             {
-                return Some( k )
+                return Some(k)
             }
         }
         
@@ -74,42 +72,42 @@ class DokDataDescription( valueType : ValueType, val denseOrders : Array[Array[I
     }
     
     
-    def update( indexes : Array[Int], value : Value )
+    def update(indexes : Array[Int], value : Value)
     {
-        if( indexes.size != indexEvaluators.size )
+        if (indexes.size != indexEvaluators.size)
         {
             return
         }
-        if( isQuick )
+        if (isQuick)
         {
-            val key = getQHash( indexes )
-            qMap( key ) = value
+            val key = getQHash(indexes)
+            qMap(key) = value
             return
         }
         
-        findKey( indexes ) match
+        findKey(indexes) match
         {
-            case s : Some[Array[Int]] => map( s.get ) = value
-            case None => { map( indexes.clone ) = value }
+            case s : Some[Array[Int]] => map(s.get) = value
+            case None => { map(indexes.clone) = value }
         }
     }
     
     
-    def apply( indexes : Array[Int] ) : Option[Value] =
+    def apply(indexes : Array[Int]) : Option[Value] =
     {
-        if( indexes.size != indexEvaluators.size )
+        if (indexes.size != indexEvaluators.size)
         {
             return None
         }
-        if( isQuick )
+        if (isQuick)
         {
-            val key = getQHash( indexes )
-            return qMap.get( key )
+            val key = getQHash(indexes)
+            return qMap.get(key)
         }
         
-        findKey( indexes ) match
+        findKey(indexes) match
         {
-            case s : Some[Array[Int]] => return map.get( s.get )
+            case s : Some[Array[Int]] => return map.get(s.get)
             case None => return None
         }
     }

@@ -12,18 +12,20 @@ import fieldml.evaluator._
 import framework.datastore._
 import framework.value._
 import framework._
+import framework.valuesource._
 
 import fieldml.jni.FieldmlApi._
 import fieldml.jni.FieldmlDataSourceType
 
 import util.ColladaExporter
 import framework.region._
+import framework.value.MeshValue
 
 object TestFieldml
 {
     def main( argv : Array[String] ) : Unit =
     {
-        val region = UserRegion.fromScratch( "test",
+        val region = UserRegion.fromScratch[MeshValue]( "test",
             "library.real.1d" -> "library.real.1d",
             "library.real.3d" -> "library.real.3d",
             "library.ensemble.rc.3d" -> "library.ensemble.rc.3d",
@@ -42,9 +44,9 @@ object TestFieldml
         val real3Type : ContinuousType = region.getObject( "library.real.3d" )
     
         val rc3ensemble : EnsembleType = region.getObject( "library.ensemble.rc.3d" )
-        val real3IndexVariable : ArgumentEvaluator = region.getObject( "library.ensemble.rc.3d.variable" )
+        val real3IndexVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "library.ensemble.rc.3d.variable" )
        
-        val xi2dVar : ArgumentEvaluator = region.getObject( "library.xi.2d.variable" )
+        val xi2dVar : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "library.xi.2d.variable" )
 
         val meshType = region.createMeshType( "test.mesh.type", 2, 2 )
         val meshVariable = region.createArgumentEvaluator( "test.mesh", meshType )
@@ -55,8 +57,8 @@ object TestFieldml
         val nodesVariable = region.createArgumentEvaluator( "test.nodes", nodes )
         
         val bilinearParametersType : ContinuousType = region.getObject( "library.parameters.2d.bilinearLagrange" )
-        val bilinearParametersVariable : ArgumentEvaluator = region.getObject( "library.parameters.2d.bilinearLagrange.variable" )
-        val bilinearIndexVariable : ArgumentEvaluator = region.getObject( "library.localNodes.2d.square2x2.variable" )
+        val bilinearParametersVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "library.parameters.2d.bilinearLagrange.variable" )
+        val bilinearIndexVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "library.localNodes.2d.square2x2.variable" )
         
         val firstInterpolator = region.createReferenceEvaluator( "test.interpolator_v1", "library.interpolator.2d.unit.bilinearLagrange", region )
         firstInterpolator.bind( xi2dVar -> xiVariable )
@@ -64,7 +66,7 @@ object TestFieldml
         val secondInterpolator = region.createReferenceEvaluator( "test.interpolator_v2", "library.interpolator.2d.unit.bilinearLagrange", region )
         secondInterpolator.bind( xi2dVar -> xiVariable )
         
-        val parameterDescription = new DenseDataDescription( realType, Array( real3IndexVariable, nodesVariable ) )
+        val parameterDescription = new DenseDataDescription[ValueSource[MeshValue]]( realType, Array( real3IndexVariable, nodesVariable ) )
         val parameterSource = region.createTextFileResource( "test.parameters.resource", "test_fieldml_nodal_params" )
         val parameterData = region.createArrayDataSource( "test.parameters.data", parameterSource, "1", 2 )
         parameterData.rawSizes = Array( 6, 3 )

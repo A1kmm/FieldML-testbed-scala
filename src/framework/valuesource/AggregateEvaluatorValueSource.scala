@@ -12,32 +12,33 @@ import framework.value.EnsembleValue
 import framework.Context
 import framework.EvaluationState
 
-class AggregateEvaluatorValueSource( name : String, valueType : ContinuousType )
-    extends AggregateEvaluator( name, valueType )
-    with ValueSource
+class AggregateEvaluatorValueSource[UserDofs](name : String, valueType : ContinuousType)
+    extends AggregateEvaluator[ValueSource[UserDofs]](name, valueType)
+    with ValueSource[UserDofs]
 {
-    override def evaluate( state : EvaluationState ) : Option[Value] =
+    override def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => Value] =
     {
         val indexType = indexBinds(1).valueType.asInstanceOf[EnsembleType]
+        val indexEvaluator = new VariableValueSource[UserDofs](name + ".index", indexType)
+        val indexValues = for (i <- 1 to indexType.elementCount) yield new EnsembleValue(indexType, i)
         
-        val indexEvaluator = new VariableValueSource( name + ".index", indexType )
-        
-        val indexValues = ( for( i <- 1 to indexType.elementCount ) yield new EnsembleValue( indexType, i ) ).toArray
-        
-        state.pushAndApply( name, binds.toSeq ++ indexBinds.toSeq.map( ( t : Tuple2[Int, Evaluator] ) => Tuple2[Evaluator, Evaluator]( t._2, indexEvaluator ) ) )
+        state.pushAndApply(name,
+                           binds.toSeq.map
+                             (v => (v._1,
+                                    v._2.asInstanceOf[ValueSource[UserDofs]])) ++
+                           indexBinds.toSeq.map((t : (Int, ValueSource[UserDofs])) =>
+                             (t._2, indexEvaluator)))
 
-        val values = for( i <- indexValues;
-             e <- componentEvaluators.get( i.eValue );
-             v <- { indexEvaluator.value = Some( i ); e.evaluate( state ) } ) yield v
+        val values = for (
+          i <- indexValues;
+          e <- componentEvaluators.get(i.eValue);
+          v <- { indexEvaluator.value = Some(i); e.evaluate(state)}) yield v
 
         state.pop()
-        
-        if( values.size != indexValues.size )
-        {
-            return None
-        }
-        
-        return Some( new ContinuousValue( valueType, values.flatMap( _.cValue ) ) )
-    }
 
+        if (values.size != indexValues.size)
+          None
+        else
+          Some(x => new ContinuousValue(valueType, values.flatMap((v : UserDofs => Value) => v(x).cValue).toArray))
+    }
 }

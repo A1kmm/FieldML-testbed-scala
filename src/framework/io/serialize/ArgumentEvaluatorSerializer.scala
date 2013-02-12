@@ -16,14 +16,13 @@ import framework.valuesource.ArgumentEvaluatorValueSource
 
 object ArgumentEvaluatorSerializer
 {
-    def insert( handle : Int, evaluator : ArgumentEvaluator ) : Unit =
+    def insert[UserDofs](handle : Int, evaluator : ArgumentEvaluatorValueSource[UserDofs]) : Unit =
     {
-        val typeHandle = GetNamedObject( handle, evaluator.valueType.name )
-        val objectHandle = Fieldml_CreateArgumentEvaluator( handle, evaluator.name, typeHandle )
+        val typeHandle = GetNamedObject(handle, evaluator.valueType.name)
+        val objectHandle = Fieldml_CreateArgumentEvaluator(handle, evaluator.name, typeHandle)
     }
-
     
-    def extract( source : Deserializer, objectHandle : Int ) : ArgumentEvaluator =
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : ArgumentEvaluatorValueSource[UserDofs] =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
         
@@ -31,10 +30,10 @@ object ArgumentEvaluatorSerializer
         
         val valueType = source.getType( typeHandle )
         
-        val args = ( 1 to Fieldml_GetArgumentCount( source.fmlHandle, objectHandle, 1, 1 ) ).map(
-            x=>source.getArgumentEvaluator( Fieldml_GetArgument( source.fmlHandle, objectHandle, x, 1, 1 ) )
+        val args = (1 to Fieldml_GetArgumentCount(source.fmlHandle, objectHandle, 1, 1)).map(
+            x=>source.getArgumentEvaluator(Fieldml_GetArgument( source.fmlHandle, objectHandle, x, 1, 1 ))
             )
         
-        new ArgumentEvaluatorValueSource( name, valueType, args:_* )
+        new ArgumentEvaluatorValueSource[UserDofs](name, valueType, args:_*)
     }
 }

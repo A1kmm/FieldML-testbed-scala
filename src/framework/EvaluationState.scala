@@ -7,14 +7,14 @@ import fieldml.evaluator.Evaluator
 import fieldml.evaluator.ArgumentEvaluator
 
 import framework.value.Value
-import framework.valuesource.ValueSource
+import framework.valuesource._
 
-class EvaluationState
+class EvaluationState[UserDofs]
 {
-    private val stack = Stack[Context]()
+    private val stack = Stack[Context[UserDofs]]()
 
 
-    private def printContext( depth : Int, c : Context )
+    private def printContext(depth : Int, c : Context[UserDofs])
     {
         for( i <- 0 until depth ) print( "  " )
         println( c.location )
@@ -37,28 +37,29 @@ class EvaluationState
     }
     
     
-    def pushAndApply( location : String, binds : Seq[Tuple2[Evaluator, Evaluator]] )
+    def pushAndApply( location : String, binds : Seq[(ValueSource[UserDofs], ValueSource[UserDofs])] )
     {
-        if( stack.size > 0 )
+        if (stack.size > 0)
         {
-            stack.push( new Context( location, Some( stack.top ), binds ) )
+            stack.push(new Context[UserDofs](location, Some(stack.top), binds))
         }
         else
         {
-            stack.push( new Context( location, None, binds ) )
+            stack.push(new Context[UserDofs](location, None, binds))
         }
     }
     
     
-    def getBind( variable : Evaluator ) : Option[Evaluator] =
+    def getBind(variable : ValueSource[UserDofs]) : Option[ValueSource[UserDofs]] =
     {
-        return stack.top.getBind( variable )
+        return stack.top.getBind(variable)
     }
     
     
-    private def restart( argument : Evaluator, binds : Seq[Tuple2[Evaluator, Evaluator]] ) : EvaluationState =
+    private def restart(argument : ValueSource[UserDofs],
+                        binds : Seq[(ValueSource[UserDofs], ValueSource[UserDofs])]) : EvaluationState[UserDofs] =
     {
-        val newState = new EvaluationState()
+        val newState = new EvaluationState[UserDofs]()
         
         newState.stack.push( new Context( "TEMP for " + argument.name, stack.top.getBindContext( argument ), binds ) )
         
@@ -66,17 +67,11 @@ class EvaluationState
     }
     
     
-    def resolve( argument : ArgumentEvaluator, binds : Seq[Tuple2[Evaluator, Evaluator]] ) : Option[Value] =
-    {
-        if( getBind( argument ) == None )
-        {
-            None
-        }
-        else
-        {
-            val tempState = restart( argument, binds )
-            
-            tempState.getBind( argument ).flatMap( _.asInstanceOf[ValueSource].evaluate( tempState ) )
-        }
-    }
+    def resolve(argument : ArgumentEvaluatorValueSource[UserDofs],
+                binds : Seq[(ValueSource[UserDofs], ValueSource[UserDofs])]) : Option[UserDofs => Value] =
+      getBind(argument).flatMap(_ => {
+        val tempState = restart( argument, binds )
+        tempState.
+          getBind(argument).flatMap(_.asInstanceOf[ValueSource[UserDofs]].evaluate(tempState))
+      })
 }

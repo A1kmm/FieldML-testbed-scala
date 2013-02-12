@@ -65,7 +65,7 @@ object DataResourceSerializer
     }
     
 
-    def extract( source : Deserializer, objectHandle : Int ) : DataResource =
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : DataResource =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
         

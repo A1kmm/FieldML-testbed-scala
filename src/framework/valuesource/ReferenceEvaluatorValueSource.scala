@@ -8,25 +8,25 @@ import framework.value.Value
 import framework.Context
 import framework.EvaluationState
 
-class ReferenceEvaluatorValueSource( name : String, refEvaluator : Evaluator, valueType : ValueType ) 
+class ReferenceEvaluatorValueSource[UserDofs]( name : String, refEvaluator : ValueSource[UserDofs], valueType : ValueType ) 
     extends ReferenceEvaluator( name, refEvaluator )
-    with GenericValueSource
+    with GenericValueSource[UserDofs]
 {
-    override def evaluate( state : EvaluationState ) : Option[Value] =
+    override def evaluate( state : EvaluationState[UserDofs] ) : Option[UserDofs => Value] =
     {
       evaluateForType( state, valueType )
     }
 
-    override def evaluateForType( state : EvaluationState,
-                                  wantedType : ValueType ) =
+    override def evaluateForType( state : EvaluationState[UserDofs],
+                                  wantedType : ValueType ) : Option[UserDofs => Value] =
     {
-        state.pushAndApply( name, binds.toSeq )
+        state.pushAndApply(name, binds.toSeq)
         
         val v = refEvaluator match {
-          case genValue : GenericValueSource =>
-            genValue.evaluateForType( state, wantedType )
+          case genValue : GenericValueSource[UserDofs] =>
+            genValue.evaluateForType(state, wantedType)
           case _ =>
-            refEvaluator.evaluate( state )
+            refEvaluator.evaluate(state)
         }
         
         state.pop()

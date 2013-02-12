@@ -14,7 +14,7 @@ import fieldml.jni.FieldmlApi._
 import fieldml.jni.FieldmlApiConstants._
 import fieldml.jni.FieldmlDataDescriptionType
 
-import framework.valuesource.ParameterEvaluatorValueSource
+import framework.valuesource._
 import framework.value.Value
 
 import util.exception._
@@ -63,24 +63,24 @@ object ParameterEvaluatorSerializer
     }
     
     
-    private def insertDok( handle : Int, objectHandle : Int, description : DokDataDescription ) : Unit =
+    private def insertDok[UserDofs]( handle : Int, objectHandle : Int, description : DokDataDescription[ValueSource[UserDofs]]) : Unit =
     {
         Fieldml_SetParameterDataDescription( handle, objectHandle, FieldmlDataDescriptionType.FML_DATA_DESCRIPTION_DOK_ARRAY )
         
         for( index <- description.sparseIndexes )
         {
-            val indexHandle = GetNamedObject( handle, index.name )
-            Fieldml_AddSparseIndexEvaluator( handle, objectHandle, indexHandle )
+            val indexHandle = GetNamedObject(handle, index.name)
+            Fieldml_AddSparseIndexEvaluator(handle, objectHandle, indexHandle)
         }
-        for( index <- description.denseIndexes )
+        for(index <- description.denseIndexes)
         {
-            val indexHandle = GetNamedObject( handle, index.name )
-            Fieldml_AddDenseIndexEvaluator( handle, objectHandle, indexHandle, FML_INVALID_HANDLE )
+            val indexHandle = GetNamedObject(handle, index.name)
+            Fieldml_AddDenseIndexEvaluator(handle, objectHandle, indexHandle, FML_INVALID_HANDLE)
         }
     }
     
     
-    private def insertDense( handle : Int, objectHandle : Int, description : DenseDataDescription ) : Unit =
+    private def insertDense[UserDofs](handle : Int, objectHandle : Int, description : DenseDataDescription[ValueSource[UserDofs]]) : Unit =
     {
         Fieldml_SetParameterDataDescription( handle, objectHandle, FieldmlDataDescriptionType.FML_DATA_DESCRIPTION_DENSE_ARRAY )
         
@@ -184,7 +184,7 @@ object ParameterEvaluatorSerializer
     */
 
     
-    def insert( handle : Int, evaluator : ParameterEvaluator  ) : Unit =
+    def insert[UserDofs]( handle : Int, evaluator : ParameterEvaluatorValueSource[UserDofs]) : Unit =
     {
         val valueHandle = GetNamedObject( handle, evaluator.valueType.name )
         
@@ -196,8 +196,8 @@ object ParameterEvaluatorSerializer
 
         evaluator.dataStore.description match
         {
-            case d : DokDataDescription => insertDok( handle, objectHandle, d )
-            case d : DenseDataDescription => insertDense( handle, objectHandle, d )
+            case d : DokDataDescription[ValueSource[UserDofs]] => insertDok( handle, objectHandle, d )
+            case d : DenseDataDescription[ValueSource[UserDofs]] => insertDense( handle, objectHandle, d )
             case unknown => println( "Cannot yet serialize data description " + unknown ); return 
         }
         
@@ -205,7 +205,7 @@ object ParameterEvaluatorSerializer
     }
     
     
-    private def initializeDokValues[T<:AnyVal:Manifest]( source : Deserializer, valueReader : Int, keyReader : Int, dok : DokDataDescription,
+    private def initializeDokValues[UserDofs,T<:AnyVal:Manifest]( source : Deserializer[UserDofs], valueReader : Int, keyReader : Int, dok : DokDataDescription[ValueSource[UserDofs]],
         SlabReader : ( Int, Array[Int], Array[Int], Array[T] ) => Int,
         ValueGenerator : ( ValueType, T* ) => Value ) : Unit =
     {
@@ -256,9 +256,11 @@ object ParameterEvaluatorSerializer
     }
     
 
-    private def initializeDenseValues[T:Manifest]( source : Deserializer, reader : Int, dense : DenseDataDescription,
-        SlabReader : ( Int, Array[Int], Array[Int], Array[T] ) => Int,
-        ValueGenerator : ( ValueType, T* ) => Value ) : Unit =
+    private def initializeDenseValues[UserDofs,T:Manifest](
+      source : Deserializer[UserDofs], reader : Int,
+      dense : DenseDataDescription[ValueSource[UserDofs]],
+      SlabReader : (Int, Array[Int], Array[Int], Array[T]) => Int,
+      ValueGenerator : (ValueType, T*) => Value) : Unit =
     {
         val sizes = dense.denseIndexes.map( _.valueType.asInstanceOf[EnsembleType].elementCount ).toArray
         val offsets = Array.fill( dense.denseIndexes.size )( 0 )
@@ -300,119 +302,121 @@ object ParameterEvaluatorSerializer
     }
 
     
-    private def extractOrder( source : Deserializer, objectHandle : Int, count : Int ) : Array[Int] =
+    private def extractOrder[UserDofs](source : Deserializer[UserDofs], objectHandle : Int, count : Int) : Array[Int] =
     {
-        val rank = Fieldml_GetArrayDataSourceRank( source.fmlHandle, objectHandle )
-        if( rank != 1 )
+        val rank = Fieldml_GetArrayDataSourceRank(source.fmlHandle, objectHandle)
+        if (rank != 1)
         {
-            throw new FmlException( "Order arrays must be 1-dimensional" )
+            throw new FmlException("Order arrays must be 1-dimensional")
         }
         
-        val reader = Fieldml_OpenReader( source.fmlHandle, objectHandle )
+        val reader = Fieldml_OpenReader(source.fmlHandle, objectHandle)
         
-        val offsets = Array( 0 )
-        val sizes = Array( count )
-        val values = new Array[Int]( count )
+        val offsets = Array(0)
+        val sizes = Array(count)
+        val values = new Array[Int](count)
         
-        val readCount = Fieldml_ReadIntSlab( reader, offsets, sizes, values )
+        val readCount = Fieldml_ReadIntSlab(reader, offsets, sizes, values)
         
-        Fieldml_CloseReader( reader )
+        Fieldml_CloseReader(reader)
         
         return values
     }
     
     
-    private def extractDok( source : Deserializer, objectHandle : Int, valueType : ValueType ) : DokDataDescription =
+    private def extractDok[UserDofs](source : Deserializer[UserDofs], objectHandle : Int, valueType : ValueType)
+      : DokDataDescription[ValueSource[UserDofs]] =
     {
-        val sparseCount = Fieldml_GetParameterIndexCount( source.fmlHandle, objectHandle, 1 )
-        val sparseIndexes = new Array[Evaluator]( sparseCount )
+        val sparseCount = Fieldml_GetParameterIndexCount(source.fmlHandle, objectHandle, 1)
+        val sparseIndexes = new Array[ValueSource[UserDofs]](sparseCount)
         
-        for( i <- 1 to sparseCount )
+        for (i <- 1 to sparseCount)
         {
-            sparseIndexes( i - 1 ) = source.getEvaluator( Fieldml_GetParameterIndexEvaluator( source.fmlHandle, objectHandle, i, 1 ) )
+            sparseIndexes(i - 1) = source.getEvaluator(Fieldml_GetParameterIndexEvaluator(source.fmlHandle, objectHandle, i, 1))
         }
         
-        val denseCount = Fieldml_GetParameterIndexCount( source.fmlHandle, objectHandle, 0 )
-        val denseIndexes = new Array[Evaluator]( denseCount )
-        val denseOrders = new Array[Array[Int]]( denseCount )
+        val denseCount = Fieldml_GetParameterIndexCount(source.fmlHandle, objectHandle, 0)
+        val denseIndexes = new Array[ValueSource[UserDofs]](denseCount)
+        val denseOrders = new Array[Array[Int]](denseCount)
         
-        for( i <- 1 to denseCount )
+        for (i <- 1 to denseCount)
         {
-            denseIndexes( i - 1 ) = source.getEvaluator( Fieldml_GetParameterIndexEvaluator( source.fmlHandle, objectHandle, i, 0 ) )
-            val indexType = Fieldml_GetValueType( source.fmlHandle, Fieldml_GetParameterIndexEvaluator( source.fmlHandle, objectHandle, i, 0 ) );
-            val ensembleCount = Fieldml_GetMemberCount( source.fmlHandle, indexType );
+            denseIndexes(i - 1) = source.getEvaluator(Fieldml_GetParameterIndexEvaluator(source.fmlHandle, objectHandle, i, 0))
+            val indexType = Fieldml_GetValueType(source.fmlHandle, Fieldml_GetParameterIndexEvaluator(source.fmlHandle, objectHandle, i, 0));
+            val ensembleCount = Fieldml_GetMemberCount(source.fmlHandle, indexType);
             
-            denseOrders( i - 1 ) = Fieldml_GetParameterIndexOrder( source.fmlHandle, objectHandle, i ) match
+            denseOrders(i - 1) = Fieldml_GetParameterIndexOrder(source.fmlHandle, objectHandle, i) match
             {
                 case FML_INVALID_HANDLE => null
                 case handle => extractOrder( source, handle, ensembleCount )
             }
         }
         
-        val dok = new DokDataDescription( valueType, denseOrders, denseIndexes, sparseIndexes )
+        val dok = new DokDataDescription[ValueSource[UserDofs]](valueType, denseOrders, denseIndexes, sparseIndexes)
         val dataHandle = Fieldml_GetDataSource( source.fmlHandle, objectHandle )
         val keyDataHandle = Fieldml_GetKeyDataSource( source.fmlHandle, objectHandle )
         
         val valueReader = Fieldml_OpenReader( source.fmlHandle, dataHandle )
-        if( valueReader == FML_INVALID_HANDLE )
+        if (valueReader == FML_INVALID_HANDLE)
         {
-            throw new FmlException( "Cannot create DOK value reader: " + Fieldml_GetLastError( source.fmlHandle )  )
+            throw new FmlException("Cannot create DOK value reader: " + Fieldml_GetLastError(source.fmlHandle))
         }
         
-        val keyReader = Fieldml_OpenReader( source.fmlHandle, keyDataHandle )
-        if( keyReader == FML_INVALID_HANDLE )
+        val keyReader = Fieldml_OpenReader(source.fmlHandle, keyDataHandle)
+        if (keyReader == FML_INVALID_HANDLE)
         {
-            throw new FmlException( "Cannot create DOK key reader: " + Fieldml_GetLastError( source.fmlHandle )  )
+            throw new FmlException("Cannot create DOK key reader: " + Fieldml_GetLastError(source.fmlHandle))
         }
         
-        if( valueType.isInstanceOf[EnsembleType] )
+        if (valueType.isInstanceOf[EnsembleType])
         {
-            val generator : ( ValueType, Int* ) => Value = ( a, b ) => Value.apply( a, b.map( _.toDouble ):_* ) 
-            initializeDokValues( source, valueReader, keyReader, dok, Fieldml_ReadIntSlab, generator )
+            val generator : (ValueType, Int*) => Value = (a, b) => Value.apply(a, b.map(_.toDouble):_*)
+            initializeDokValues(source, valueReader, keyReader, dok, Fieldml_ReadIntSlab, generator)
         }
-        else if( valueType.isInstanceOf[ContinuousType] )
+        else if (valueType.isInstanceOf[ContinuousType])
         {
-            val generator : ( ValueType, Double* ) => Value = Value.apply
-            initializeDokValues( source, valueReader, keyReader, dok, Fieldml_ReadDoubleSlab, generator )
+            val generator : (ValueType, Double*) => Value = Value.apply
+            initializeDokValues(source, valueReader, keyReader, dok, Fieldml_ReadDoubleSlab, generator)
         }
         else
         {
-            throw new FmlException( "Cannot yet initialize " + valueType.name + " valued parameter evaluator" )
+            throw new FmlException("Cannot yet initialize " + valueType.name + " valued parameter evaluator")
         }
         
-        Fieldml_CloseReader( valueReader )
-        Fieldml_CloseReader( keyReader )
+        Fieldml_CloseReader(valueReader)
+        Fieldml_CloseReader(keyReader)
         
         dok
     }
     
     
-    private def extractDense( source : Deserializer, objectHandle : Int, valueType : ValueType ) : DenseDataDescription =
+    private def extractDense[UserDofs](source : Deserializer[UserDofs], objectHandle : Int, valueType : ValueType) :
+      DenseDataDescription[ValueSource[UserDofs]] =
     {
-        val denseCount = Fieldml_GetParameterIndexCount( source.fmlHandle, objectHandle, 0 )
-        val denseIndexes = new Array[Evaluator]( denseCount )
-        val denseOrders = new Array[Array[Int]]( denseCount )
+        val denseCount = Fieldml_GetParameterIndexCount(source.fmlHandle, objectHandle, 0)
+        val denseIndexes : Array[ValueSource[UserDofs]] = new Array[ValueSource[UserDofs]](denseCount)
+        val denseOrders = new Array[Array[Int]](denseCount)
         
         for( i <- 1 to denseCount )
         {
-            denseIndexes( i - 1 ) = source.getEvaluator( Fieldml_GetParameterIndexEvaluator( source.fmlHandle, objectHandle, i, 0 ) )
+            denseIndexes(i - 1) = source.getEvaluator( Fieldml_GetParameterIndexEvaluator( source.fmlHandle, objectHandle, i, 0 ) )
             val indexType = Fieldml_GetValueType( source.fmlHandle, Fieldml_GetParameterIndexEvaluator( source.fmlHandle, objectHandle, i, 0 ) );
             val ensembleCount = Fieldml_GetMemberCount( source.fmlHandle, indexType );
             
-            denseOrders( i - 1 ) = Fieldml_GetParameterIndexOrder( source.fmlHandle, objectHandle, i ) match
+            denseOrders(i - 1) = Fieldml_GetParameterIndexOrder(source.fmlHandle, objectHandle, i) match
             {
                 case FML_INVALID_HANDLE => null
-                case handle => extractOrder( source, handle, ensembleCount )
+                case handle => extractOrder(source, handle, ensembleCount)
             }
         }
+
+        val dense = new DenseDataDescription[ValueSource[UserDofs]](valueType, denseOrders, denseIndexes)
+        val dataHandle = Fieldml_GetDataSource(source.fmlHandle, objectHandle)
         
-        val dense = new DenseDataDescription( valueType, denseOrders, denseIndexes )
-        val dataHandle = Fieldml_GetDataSource( source.fmlHandle, objectHandle )
-        
-        val reader = Fieldml_OpenReader( source.fmlHandle, dataHandle )
-        if( reader == FML_INVALID_HANDLE )
+        val reader = Fieldml_OpenReader(source.fmlHandle, dataHandle)
+        if (reader == FML_INVALID_HANDLE)
         {
-            throw new FmlException( "Cannot create semidense reader: " + Fieldml_GetLastError( source.fmlHandle )  )
+            throw new FmlException("Cannot create semidense reader: " + Fieldml_GetLastError(source.fmlHandle))
         }
         
         if( valueType.isInstanceOf[EnsembleType] )
@@ -436,7 +440,7 @@ object ParameterEvaluatorSerializer
     }
     
     
-    def extract( source : Deserializer, objectHandle : Int ) : ParameterEvaluator =
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : ParameterEvaluatorValueSource[UserDofs] =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
 

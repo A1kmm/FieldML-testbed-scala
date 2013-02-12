@@ -7,11 +7,11 @@ import util.exception._
 import fieldml.jni.FieldmlApi._
 import fieldml.jni.FieldmlApiConstants._
 
-import framework.valuesource.PiecewiseEvaluatorValueSource
+import framework.valuesource._
 
 object PiecewiseEvaluatorSerializer
 {
-    def insert( handle : Int, evaluator : PiecewiseEvaluator ) : Unit =
+    def insert[UserDofs](handle : Int, evaluator : PiecewiseEvaluator[ValueSource[UserDofs]]) : Unit =
     {
         val indexHandle = GetNamedObject( handle, evaluator.index.name )
         val valueHandle = GetNamedObject( handle, evaluator.valueType.name )
@@ -35,7 +35,7 @@ object PiecewiseEvaluatorSerializer
     }
 
     
-    def extract( source : Deserializer, objectHandle : Int ) : PiecewiseEvaluator =
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : PiecewiseEvaluatorValueSource[UserDofs] =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
 

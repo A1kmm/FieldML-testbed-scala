@@ -11,6 +11,7 @@ import fieldml.evaluator._
 
 import framework.datastore._
 import framework.value._
+import framework.valuesource._
 import framework._
 
 import fieldml.jni.FieldmlApi._
@@ -18,12 +19,13 @@ import fieldml.jni.FieldmlApi._
 import util.ColladaExporter
 import util.JSONExporter
 import framework.region._
+import framework.value.MeshValue
 
 object BiquadraticTest
 {
     def main( argv : Array[String] ) : Unit =
     {
-        val region = UserRegion.fromScratch( "test",
+        val region = UserRegion.fromScratch[MeshValue]( "test",
             "library.real.1d" -> "real.1d",
             "library.real.3d" -> "real.3d",
             "library.ensemble.rc.3d" -> "coordinates.rc.3d.component",
@@ -48,10 +50,10 @@ object BiquadraticTest
         val real3Type : ContinuousType = region.getObject( "real.3d" )
     
         val rc3ensemble : EnsembleType = region.getObject( "ensemble.rc.3d" )
-        val real3IndexVariable : ArgumentEvaluator = region.getObject( "ensemble.rc.3d.argument" )
+        val real3IndexVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "ensemble.rc.3d.argument" )
        
         val xi2dType : ContinuousType = region.getObject( "xi.2d" )
-        val xi2dVar : ArgumentEvaluator = region.getObject( "xi.2d.argument" )
+        val xi2dVar : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "xi.2d.argument" )
 
         val meshType = region.createMeshType( "test.mesh.type", 9, 2 )
         val meshVariable = region.createArgumentEvaluator( "test.mesh", meshType )
@@ -62,12 +64,12 @@ object BiquadraticTest
         val nodesVariable = region.createArgumentEvaluator( "test.nodes", nodes )
         
         val bilinearParametersType : ContinuousType = region.getObject( "parameters.2d.bilinearLagrange" )
-        val bilinearParametersVariable : ArgumentEvaluator = region.getObject( "parameters.2d.bilinearLagrange.argument" )
-        val bilinearIndexVariable : ArgumentEvaluator = region.getObject( "localNodes.2d.square2x2.argument" )
+        val bilinearParametersVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "parameters.2d.bilinearLagrange.argument" )
+        val bilinearIndexVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "localNodes.2d.square2x2.argument" )
         
         val biquadraticParametersType : ContinuousType = region.getObject( "parameters.2d.biquadraticLagrange" )
-        val biquadraticParametersVariable : ArgumentEvaluator = region.getObject( "parameters.2d.biquadraticLagrange.argument" )
-        val biquadraticIndexVariable : ArgumentEvaluator = region.getObject( "localNodes.2d.square3x3.argument" )
+        val biquadraticParametersVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "parameters.2d.biquadraticLagrange.argument" )
+        val biquadraticIndexVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "localNodes.2d.square3x3.argument" )
         
         val bilinearInterpolator = region.createReferenceEvaluator( "test.bilinear_interpolator", "interpolator.2d.unit.bilinearLagrange", region )
         bilinearInterpolator.bind( xi2dVar -> xiVariable )
@@ -75,7 +77,7 @@ object BiquadraticTest
         val biquadraticInterpolator = region.createReferenceEvaluator( "test.biquadratic_interpolator", "interpolator.2d.unit.biquadraticLagrange", region )
         biquadraticInterpolator.bind( xi2dVar -> xiVariable )
         
-        val parameterDescription = new DenseDataDescription( realType, Array( real3IndexVariable, nodesVariable ) )
+        val parameterDescription = new DenseDataDescription[ValueSource[MeshValue]]( realType, Array( real3IndexVariable, nodesVariable ) )
         val parameterResource = region.createTextInlineResource( "test.parameters.resource", "" )
         val parameterData = region.createArrayDataSource( "test.parameters.data", parameterResource, "1", 2 )
         parameterData.rawSizes = Array( 48, 3 )
@@ -103,7 +105,7 @@ object BiquadraticTest
         val bilinearElementSet = Array[Int]( 5 )
         val bilinearParameterSet = null
         
-        val bilinearConnectivityDesc = new DokDataDescription( nodes, Array( bilinearParameterSet, bilinearElementSet  ), Array( bilinearIndexVariable, elementVariable ), Array() )
+        val bilinearConnectivityDesc = new DokDataDescription( nodes, Array(bilinearParameterSet, bilinearElementSet), Seq( bilinearIndexVariable, elementVariable ), Seq() )
         val bilinearConnectivityResource = region.createTextInlineResource( "test.bilinear_connectivity.resource", "" )
         val bilinearConnectivityData = region.createArrayDataSource( "test.bilinear_connectivity.data", bilinearConnectivityResource, "1", 2 )
         bilinearConnectivityData.rawSizes = Array( 1, 4 )
@@ -115,7 +117,7 @@ object BiquadraticTest
         val biquadraticElementSet = Array[Int]( 1, 2, 3, 4, 6, 7, 8, 9 )
         val biquadraticParameterSet = null
         
-        val biquadraticConnectivityDesc = new DokDataDescription( nodes, Array( biquadraticParameterSet, biquadraticElementSet ), Array( biquadraticIndexVariable, elementVariable ), Array() )
+        val biquadraticConnectivityDesc = new DokDataDescription(nodes, Array(biquadraticParameterSet, biquadraticElementSet), Seq(biquadraticIndexVariable, elementVariable), Seq())
         val biquadraticConnectivityResource = region.createTextInlineResource( "test.biquadratic_connectivity.resource", "" )
         val biquadraticConnectivityData = region.createArrayDataSource( "test.biquadratic_connectivity.data", parameterResource, "1", 2 )
         biquadraticConnectivityData.rawSizes = Array( 8, 9 )
@@ -145,18 +147,19 @@ object BiquadraticTest
         
         println( "*** piecewise(?) = " + region.evaluate( piecewise ) )
         
-        val bilinearParameters = region.createAggregateEvaluator( "test.bilinear_parameters", bilinearParametersType ) 
+        val bilinearParameters : AggregateEvaluatorValueSource[MeshValue]
+          = region.createAggregateEvaluator("test.bilinear_parameters", bilinearParametersType)
         bilinearParameters.bind_index( 1 -> bilinearIndexVariable )
         bilinearParameters.bind( nodesVariable -> bilinearConnectivity )
-        bilinearParameters.setDefault( parameters )
+        bilinearParameters.setDefault(parameters)
 
         val biquadraticParameters = region.createAggregateEvaluator( "test.biquadratic_parameters", biquadraticParametersType ) 
         biquadraticParameters.bind_index( 1 -> biquadraticIndexVariable )
         biquadraticParameters.bind( nodesVariable -> biquadraticConnectivity )
-        biquadraticParameters.setDefault( parameters )
+        biquadraticParameters.setDefault(parameters)
 
-        piecewise.bind( biquadraticParametersVariable -> biquadraticParameters )
-        piecewise.bind( bilinearParametersVariable -> bilinearParameters )
+        piecewise.bind(biquadraticParametersVariable -> biquadraticParameters)
+        piecewise.bind(bilinearParametersVariable -> bilinearParameters)
         
         region.bind( meshVariable, 2, 0, 0 )
         region.bind( real3IndexVariable, 3 )
@@ -176,10 +179,10 @@ object BiquadraticTest
         println( "*** piecewise(2, 1, 1) = " + region.evaluate( piecewise ) )
 
         val aggregate = region.createAggregateEvaluator( "test.aggregate", real3Type )
-        aggregate.bind_index( 1 -> real3IndexVariable )
-        aggregate.map( 1 -> piecewise )
-        aggregate.map( 2 -> piecewise )
-        aggregate.map( 3 -> piecewise )
+        aggregate.bind_index(1 -> real3IndexVariable)
+        aggregate.map(1 -> piecewise)
+        aggregate.map(2 -> piecewise)
+        aggregate.map(3 -> piecewise)
         
         region.bind( meshVariable, 2, 0.5, 0.5 )
 

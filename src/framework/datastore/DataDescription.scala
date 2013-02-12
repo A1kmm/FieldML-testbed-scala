@@ -9,9 +9,9 @@ import util.exception.FmlException
 
 import util.TupleToArray
 
-abstract class DataDescription( val valueType : ValueType )
+abstract class DataDescription[EvType <: Evaluator[EvType]]( val valueType : ValueType )
 {
-    def indexEvaluators : Array[Evaluator]
+    def indexEvaluators : Seq[EvType]
     
     
     def update( indexes : Array[Int], value : Value )

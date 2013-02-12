@@ -11,16 +11,15 @@ import fieldml.valueType.BooleanType
 
 object BooleanTypeSerializer
 {
-    def insert( handle : Int, valueType : BooleanType ) : Unit =
+    def insert[UserDofs]( handle : Int, valueType : BooleanType ) : Unit =
     {
         val objectHandle = Fieldml_CreateBooleanType( handle, valueType.name )
     }
 
     
-    def extract( source : Deserializer, objectHandle : Int ) : BooleanType =
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : BooleanType =
     {
-        val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
-
-        new BooleanType( name )
+        val name = Fieldml_GetObjectName(source.fmlHandle, objectHandle)
+        new BooleanType(name)
     }
 }

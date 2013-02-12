@@ -28,7 +28,7 @@ object DataSourceSerializer
     }
 
     
-    private def extractArrayDataSource( source : Deserializer, objectHandle : Int ) : DataSource =
+    private def extractArrayDataSource[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : DataSource =
     {
         val resourceHandle = Fieldml_GetDataSourceResource( source.fmlHandle, objectHandle )
         val resource = source.getDataResource( resourceHandle )
@@ -41,7 +41,7 @@ object DataSourceSerializer
     }
     
     
-    def extract( source : Deserializer, objectHandle : Int ) : DataSource =
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : DataSource =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
         

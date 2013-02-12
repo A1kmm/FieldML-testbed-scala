@@ -7,6 +7,8 @@ import framework.value.Value
 
 import fieldml.evaluator.ArgumentEvaluator
 import fieldml.evaluator.Evaluator
+import framework.value.MeshValue
+import framework.valuesource._
 import fieldml.valueType.MeshType
 import fieldml.valueType.ContinuousType
 import scala.util.matching._
@@ -113,16 +115,20 @@ $polygonBlock
     override val closePolygon = "</p>\n"
 
     def export2DFromFieldML(
-      outputName : String, region : Region, discretisation : Int,
+      outputName : String, region : Region[MeshValue], discretisation : Int,
       meshName : String, evaluatorName : String) : String =
     {
-        val meshVariable : ArgumentEvaluator = region.getObject( meshName )
+        val meshVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( meshName )
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
-        val meshEvaluator : Evaluator = region.getObject( evaluatorName )
+        val meshEvaluator : ValueSource[MeshValue] = region.getObject( evaluatorName )
         val elementCount = meshType.elementType.elementCount
 
         val xyzArray = new StringBuilder()
         val polygonBlock = new StringBuilder()
+
+        region.bind(meshVariable, (x : MeshValue) => x)
+        val Some(f : (MeshValue => Value)) = region.evaluate(meshEvaluator)
+
         for( elementNumber <- 1 to elementCount )
         {
             for( i <- 0 to discretisation )
@@ -132,9 +138,7 @@ $polygonBlock
                     val xi1 : Double = i * 1.0 / discretisation
                     val xi2 : Double = j * 1.0 / discretisation
                     
-                    region.bind(meshVariable, elementNumber, xi1, xi2)
-                    
-                    val value = region.evaluate(meshEvaluator)
+                    val value = f(new MeshValue(meshType, elementNumber, xi1, xi2))
                     
                     xyzArray.append(formatTriple(value))
                 }
@@ -169,53 +173,54 @@ $polygonBlock
 
 
     def export2DTrisFromFieldML(
-      outputName : String, region : Region, discretisation : Int,
+      outputName : String, region : Region[MeshValue], discretisation : Int,
       meshName : String, evaluatorName : String) : String =
     {
-        val meshVariable : ArgumentEvaluator = region.getObject( meshName )
+        val meshVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject(meshName)
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
-        val meshEvaluator : Evaluator = region.getObject( evaluatorName )
+        val meshEvaluator : ValueSource[MeshValue] = region.getObject(evaluatorName)
         val elementCount = meshType.elementType.elementCount
+
+        region.bind(meshVariable, (x : MeshValue) => x)
+        val Some(f : (MeshValue => Value)) = region.evaluate(meshEvaluator)
 
         //TODO Currently ignores discretisation
         
         val xyzArray = new StringBuilder()
         val polygonBlock = new StringBuilder()
-        for( elementNumber <- 1 to elementCount )
+        for (elementNumber <- 1 to elementCount)
         {
-            for( i <- 0 to 1 )
+            for (i <- 0 to 1)
             {
-                for( j <- 0 to 1 )
+                for (j <- 0 to 1)
                 {
                     val xi1 : Double = i * 1.0
                     val xi2 : Double = j * 1.0
-                    if( xi1 + xi2 <= 1.0 )
+                    if (xi1 + xi2 <= 1.0)
                     {
-                        region.bind( meshVariable, elementNumber, xi1, xi2 )
-                        
-                        val value = region.evaluate( meshEvaluator )
+                        val value = f(new MeshValue(meshType, elementNumber, xi1, xi2))
                         
                         xyzArray.append(formatTriple(value))
                     }
                 }
             }
-            xyzArray.append( "\n" )
+            xyzArray.append("\n")
 
-            val nodeOffsetOfElement = ( elementNumber - 1 ) * 3
+            val nodeOffsetOfElement = (elementNumber - 1) * 3
             var counter = 0
-            for( i <- 0 until 1 )
+            for (i <- 0 until 1)
             {
-                for( j <- 0 until 1 )
+                for (j <- 0 until 1)
                 {
-                    if( i + j <= 1 )
+                    if (i + j <= 1)
                     {
                         val node1 = nodeOffsetOfElement + counter
                         val node2 = nodeOffsetOfElement + counter + 1
                         val node3 = nodeOffsetOfElement + counter + 2
                         polygonBlock.append(openPolygon)
-                        polygonBlock.append( " " + node1 )
-                        polygonBlock.append( " " + node2 )
-                        polygonBlock.append( " " + node3 )
+                        polygonBlock.append( " " + node1)
+                        polygonBlock.append( " " + node2)
+                        polygonBlock.append( " " + node3)
                         polygonBlock.append(closePolygon)
                         
                         counter = counter + 3
@@ -233,87 +238,91 @@ $polygonBlock
 
 
     def export2DFromFieldML(
-      outputName : String, region : Region, discretisation : Int, meshName : String,
+      outputName : String, region : Region[MeshValue], discretisation : Int, meshName : String,
       geometryName : String, valueName : String) : String =
     {
-        val meshVariable : ArgumentEvaluator = region.getObject( meshName )
+        val meshVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject(meshName)
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
-        val meshEvaluator : Evaluator = region.getObject( geometryName )
-        val heightEvaluator : Evaluator = region.getObject( valueName )
+        val meshEvaluator : ValueSource[MeshValue] = region.getObject(geometryName)
+        val heightEvaluator : ValueSource[MeshValue] = region.getObject(valueName)
         val elementCount = meshType.elementType.elementCount
+
+        region.bind(meshVariable, (x : MeshValue) => x)
+        val Some(f : (MeshValue => Value)) = region.evaluate(meshEvaluator)
+        val Some(g : (MeshValue => Value)) = region.evaluate(heightEvaluator)
 
         val xyzArray = new StringBuilder()
         val polygonBlock = new StringBuilder()
-        for( elementNumber <- 1 to elementCount )
+        for (elementNumber <- 1 to elementCount)
         {
-            for( i <- 0 to discretisation )
+            for (i <- 0 to discretisation)
             {
-                for( j <- 0 to discretisation )
+                for (j <- 0 to discretisation)
                 {
                     val xi1 : Double = i * 1.0 / discretisation
                     val xi2 : Double = j * 1.0 / discretisation
-                    
-                    region.bind( meshVariable, elementNumber, xi1, xi2, 0 )
-                    
-                    val value = region.evaluate( meshEvaluator )
-                    
-                    val zValue = region.evaluate( heightEvaluator )
+
+                    val point = new MeshValue(meshType, elementNumber, xi1, xi2, 0)
+
+                    val value = f(point)
+                    val zValue = g(point)
                     
                     xyzArray.append(formatPair(value, zValue))
                 }
             }
-            xyzArray.append( "\n" )
+            xyzArray.append("\n")
 
-            val nodeOffsetOfElement = ( elementNumber - 1 ) * ( discretisation + 1 ) * ( discretisation + 1 )
-            for( i <- 0 until discretisation )
+            val nodeOffsetOfElement = (elementNumber - 1) * (discretisation + 1) * (discretisation + 1)
+            for (i <- 0 until discretisation)
             {
-                for( j <- 0 until discretisation )
+                for (j <- 0 until discretisation)
                 {
-                    val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 0 ) + ( j + 0 )
-                    val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 0 ) + ( j + 1 )
-                    val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 1 )
-                    val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + ( discretisation + 1 ) * ( i + 1 ) + ( j + 0 )
+                    val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 0) + (j + 0)
+                    val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 0) + (j + 1)
+                    val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 1) + (j + 1)
+                    val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + (discretisation + 1) * (i + 1) + (j + 0)
                     polygonBlock.append(openPolygon)
-                    polygonBlock.append( " " + (nodeAtLowerXi1LowerXi2 ))
-                    polygonBlock.append( " " + (nodeAtLowerXi1UpperXi2 ))
-                    polygonBlock.append( " " + (nodeAtUpperXi1UpperXi2 ))
-                    polygonBlock.append( " " + (nodeAtUpperXi1LowerXi2 ))
+                    polygonBlock.append(" " + (nodeAtLowerXi1LowerXi2))
+                    polygonBlock.append(" " + (nodeAtLowerXi1UpperXi2))
+                    polygonBlock.append(" " + (nodeAtUpperXi1UpperXi2))
+                    polygonBlock.append(" " + (nodeAtUpperXi1LowerXi2))
                     polygonBlock.append(closePolygon)
                 }
             }
         }
 
         val polygonCount = discretisation * discretisation * elementCount
-        val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
+        val vertexCount = (discretisation + 1) * (discretisation + 1) * elementCount
         val xyzArrayCount = vertexCount * 3
 
         fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange")
     }
 
     def export1DFromFieldML(
-      outputName : String, region : Region, discretisation : Int, meshName : String,
-      evaluatorName : String ) : String =
+      outputName : String, region : Region[MeshValue], discretisation : Int, meshName : String,
+      evaluatorName : String) : String =
     {
-        val meshVariable : ArgumentEvaluator = region.getObject( meshName )
+        val meshVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject(meshName)
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
-        val meshEvaluator : Evaluator = region.getObject( evaluatorName )
+        val meshEvaluator : ValueSource[MeshValue] = region.getObject(evaluatorName)
         val elementCount = meshType.elementType.elementCount
         val deltaX = 1.0 / discretisation
         var x = deltaX
         val dimensions = meshEvaluator.valueType.asInstanceOf[ContinuousType].componentType.elementCount
 
+        region.bind(meshVariable, (x : MeshValue) => x)
+        val Some(f) = region.evaluate(meshEvaluator)
+
         val xyzArray = new StringBuilder()
         val polygonBlock = new StringBuilder()
-        for( elementNumber <- 1 to elementCount )
+        for (elementNumber <- 1 to elementCount)
         {
             x -= deltaX
-            for( j <- 0 to discretisation )
+            for (j <- 0 to discretisation)
             {
                 val xi1 : Double = j * 1.0 / discretisation
-
-                region.bind( meshVariable, elementNumber, xi1 )
-                
-                val value = region.evaluate( meshEvaluator )
+  
+                val value = f(new MeshValue(meshType, elementNumber, xi1))
                 dimensions match
                 {
                     case 1 => { xyzArray.append(formatSingle(value, x, 0.0))
@@ -326,27 +335,27 @@ $polygonBlock
                 
                 x += deltaX
             }
-            xyzArray.append( "\n" )
+            xyzArray.append("\n")
 
-            val nodeOffsetOfElement = ( elementNumber - 1 ) * ( discretisation + 1 ) * 2
+            val nodeOffsetOfElement = (elementNumber - 1) * (discretisation + 1) * 2
 
-            for( j <- 0 until discretisation )
+            for (j <- 0 until discretisation)
             {
-                val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + ( j * 2 ) + 0
-                val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + ( j * 2 ) + 2
-                val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + ( j * 2 ) + 3
-                val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + ( j * 2 ) + 1
+                val nodeAtLowerXi1LowerXi2 = nodeOffsetOfElement + (j * 2) + 0
+                val nodeAtLowerXi1UpperXi2 = nodeOffsetOfElement + (j * 2) + 2
+                val nodeAtUpperXi1UpperXi2 = nodeOffsetOfElement + (j * 2) + 3
+                val nodeAtUpperXi1LowerXi2 = nodeOffsetOfElement + (j * 2) + 1
                 polygonBlock.append(openPolygon)
-                polygonBlock.append( " " + nodeAtLowerXi1LowerXi2 )
-                polygonBlock.append( " " + nodeAtLowerXi1UpperXi2 )
-                polygonBlock.append( " " + nodeAtUpperXi1UpperXi2 )
-                polygonBlock.append( " " + nodeAtUpperXi1LowerXi2 )
+                polygonBlock.append(" " + nodeAtLowerXi1LowerXi2)
+                polygonBlock.append(" " + nodeAtLowerXi1UpperXi2)
+                polygonBlock.append(" " + nodeAtUpperXi1UpperXi2)
+                polygonBlock.append(" " + nodeAtUpperXi1LowerXi2)
                 polygonBlock.append(closePolygon)
             }
         }
 
         val polygonCount = discretisation * elementCount
-        val vertexCount = ( discretisation + 1 ) * 2 * elementCount
+        val vertexCount = (discretisation + 1) * 2 * elementCount
         val xyzArrayCount = vertexCount * 3
 
         fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange")

@@ -27,7 +27,7 @@ object MeshTypeSerializer
     }
 
     
-    def extract( source : Deserializer, objectHandle : Int ) : MeshType =
+    def extract[UserDofs]( source : Deserializer[UserDofs], objectHandle : Int ) : MeshType =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
         val xiComponentHandle = Fieldml_GetMeshChartComponentType( source.fmlHandle, objectHandle )

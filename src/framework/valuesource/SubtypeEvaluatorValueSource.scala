@@ -13,16 +13,10 @@ import framework.value.StructuredValue
 import framework.Context
 import framework.EvaluationState
 
-class SubtypeEvaluatorValueSource( baseEvaluator : Evaluator, subname : String )
-    extends SubtypeEvaluator( baseEvaluator, subname )
-    with ValueSource
+class SubtypeEvaluatorValueSource[UserDofs](baseEvaluator : ValueSource[UserDofs], subname : String)
+    extends SubtypeEvaluator[ValueSource[UserDofs]](baseEvaluator, subname)
+    with ValueSource[UserDofs]
 {
-    override def evaluate( state : EvaluationState ) : Option[Value] =
-    {
-        baseEvaluator.evaluate( state ) match
-        {
-            case m : Some[StructuredValue] => Some( m.get.subvalue( subname ) ) 
-            case _ => return None
-        }
-    }
+    override def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => Value] =
+      baseEvaluator.evaluate(state).map(m => (x : UserDofs) => m(x).subvalue(subname))
 }

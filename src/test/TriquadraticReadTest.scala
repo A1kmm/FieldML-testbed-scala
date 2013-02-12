@@ -7,6 +7,7 @@ import fieldml.valueType._
 import fieldml.evaluator._
 import framework.datastore._
 import framework.value._
+import framework.valuesource._
 import framework._
 import fieldml.jni.FieldmlApi._
 import util.ColladaExporter
@@ -21,16 +22,16 @@ object TriquadraticReadTest
         
         // configStrings = Tuple4( "input\\StaticAdvectionDiffusion.xml", "static_advection_diffusion.mesh", "static_advection_diffusion.mesh.argument", "static_advection_diffusion.geometric" )
         
-        val region = UserRegion.fromFile( "heart", configStrings._1 )
+        val region = UserRegion.fromFile[MeshValue]( "heart", configStrings._1 )
 
         val meshType : MeshType = region.getObject( configStrings._2 )
-        val meshArgument : ArgumentEvaluator = region.getObject( configStrings._3 )
+        val meshArgument : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( configStrings._3 )
 
-        val coordinates : Evaluator = region.getObject( configStrings._4 )
+        val coordinates : ValueSource[MeshValue] = region.getObject( configStrings._4 )
         
-        val triquadNodes : ParameterEvaluator = region.getObject( "heart.node.coordinates" )
-        val nodeArgument : ArgumentEvaluator = region.getObject( "heart.nodes.argument" )
-        val rc3Argument : ArgumentEvaluator = region.getObject( "heart.rc3.component" )
+        val triquadNodes : ParameterEvaluatorValueSource[MeshValue] = region.getObject( "heart.node.coordinates" )
+        val nodeArgument : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "heart.nodes.argument" )
+        val rc3Argument : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "heart.rc3.component" )
         
         region.bind( meshArgument, 1, 0.5, 0.5, 0.5 )
 

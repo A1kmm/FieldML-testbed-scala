@@ -11,6 +11,7 @@ import fieldml.evaluator._
 
 import framework.datastore._
 import framework.value._
+import framework.valuesource._
 import framework._
 
 import fieldml.jni.FieldmlApi._
@@ -18,6 +19,7 @@ import fieldml.jni.FieldmlApi._
 import util.ColladaExporter
 import util.JSONExporter
 import framework.region._
+import framework.value.MeshValue
 
 object BilinearSimplexReadTest
 {
@@ -51,12 +53,12 @@ object BilinearSimplexReadTest
         val exporter = ColladaExporter.export2DTrisFromFieldML _
         */
             
-        val region = UserRegion.fromFile( regionName, fileName )
+        val region = UserRegion.fromFile[MeshValue]( regionName, fileName )
 
         val meshType : MeshType = region.getObject( meshTypeName )
-        val meshArgument : ArgumentEvaluator = region.getObject( meshArgumentName )
+        val meshArgument : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( meshArgumentName )
 
-        val coordinates : Evaluator = region.getObject( meshCoordinatesName )
+        val coordinates : ValueSource[MeshValue] = region.getObject( meshCoordinatesName )
         
         region.bind( meshArgument, 20, 0.5, 0.5, 0.5 )
 

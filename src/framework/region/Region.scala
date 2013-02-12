@@ -1,6 +1,6 @@
 package framework.region
 
-import scala.collection.mutable.Map
+import scala.collection.mutable.HashMap
 
 import fieldml.FieldmlObject
 import fieldml.valueType._
@@ -19,13 +19,11 @@ import framework.value.ContinuousValue
 import framework.value.EnsembleValue
 import framework.value.MeshValue
 
-abstract class Region( val name : String )
+abstract class Region[UserDofs]( val name : String )
 {
-    protected val objects = Map[String, FieldmlObject]()
-
-    private val companions = Map[ValueType, ArgumentEvaluatorValueSource]()
-    
-    private val binds = Map[ ArgumentEvaluator, Evaluator ]()
+    protected val objects = HashMap[String, FieldmlObject]()
+    private val companions = HashMap[ValueType, ArgumentEvaluatorValueSource[UserDofs]]()
+    private val binds = HashMap[ArgumentEvaluatorValueSource[UserDofs], ValueSource[UserDofs]]()
     
     //TODO Use region names
     def getObject[A <: FieldmlObject]( objectName : String ) : A =
@@ -40,51 +38,46 @@ abstract class Region( val name : String )
     }
     
     
-    def evaluate( evaluator : Evaluator ) : Option[Value] =
+    def evaluate(evaluator : ValueSource[UserDofs]) : Option[UserDofs => Value] =
     {
-        val state = new EvaluationState()
-        
-        state.pushAndApply( "Region " + name, binds.toSeq )
-        
-        val v = evaluator.evaluate( state )
-        
-        state.pop();
+        val state = new EvaluationState[UserDofs]()
+        state.pushAndApply("Region " + name, binds.toSeq)
+        val v = evaluator.evaluate(state)
+        state.pop()
         
         return v
     }
     
-    
-    def bind( variable : ArgumentEvaluator, value : Value ) : Unit =
+    def bind(variable : ArgumentEvaluatorValueSource[UserDofs], value : UserDofs => Value) : Unit =
     {
-        binds( variable ) = new ConstantValueSource( value )
+        binds(variable) = new DOFDependentValueSource(value, variable.valueType)
     }
     
-    
-    def bind( variable : ArgumentEvaluator, element : Int, xi : Double* ) : Unit =
+    def bind(variable : ArgumentEvaluatorValueSource[UserDofs], element : Int, xi : Double*) : Unit =
     {
         variable.valueType match
         {
-            case m : MeshType => bind( variable, new MeshValue( m, element, xi:_* ) )
+            case m : MeshType => bind(variable, _ => new MeshValue(m, element, xi:_*))
             case _ =>
         }
     }
     
     
-    def bind( variable : ArgumentEvaluator, value : Int ) : Unit =
+    def bind(variable : ArgumentEvaluatorValueSource[UserDofs], value : Int) : Unit =
     {
         variable.valueType match
         {
-            case e : EnsembleType => bind( variable, new EnsembleValue( e, value ) )
+            case e : EnsembleType => bind(variable, _ => new EnsembleValue(e, value))
             case _ =>
         }
     }
     
     
-    def bind( variable : ArgumentEvaluator, value : Double* ) : Unit =
+    def bind(variable : ArgumentEvaluatorValueSource[UserDofs], value : Double*) : Unit =
     {
         variable.valueType match
         {
-            case c : ContinuousType => bind( variable, new ContinuousValue( c, value:_* ) )
+            case c : ContinuousType => bind(variable, _ => new ContinuousValue(c, value:_*))
             case _ =>
         }
     }

@@ -12,6 +12,7 @@ import fieldml.evaluator._
 import framework.datastore._
 import framework.value._
 import framework._
+import framework.valuesource._
 
 import fieldml.jni.FieldmlApi._
 
@@ -29,14 +30,14 @@ object TestHierarchical
         val meshCoordinatesName = "coordinates"
         val outputName = "output\\collada hierarchical.xml"
 
-        val region = UserRegion.fromFile( regionName, fileName )
+        val region = UserRegion.fromFile[MeshValue]( regionName, fileName )
 
         val meshType : MeshType = region.getObject( meshTypeName )
-        val meshArgument : ArgumentEvaluator = region.getObject( meshArgumentName )
+        val meshArgument : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( meshArgumentName )
 
-        val coordinates : Evaluator = region.getObject( meshCoordinatesName )
+        val coordinates : ValueSource[MeshValue] = region.getObject( meshCoordinatesName )
         
-        val test : Evaluator = region.getObject( meshCoordinatesName )
+        val test : ValueSource[MeshValue] = region.getObject( meshCoordinatesName )
         
         region.bind( meshArgument, 1, 1.0, 0.99 )
         println( "*** aggregate1 = " + region.evaluate( test ) )

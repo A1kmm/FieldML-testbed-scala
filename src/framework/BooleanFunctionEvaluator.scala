@@ -4,20 +4,18 @@ import fieldml.evaluator._
 import fieldml.valueType._
 
 import framework.valuesource._
-
+import value.Value
 import value.BooleanValue
 
-class BooleanFunctionEvaluator( name : String, val function : ( Array[Double] ) => Boolean, val var1 : Evaluator, valueType : BooleanType )
-    extends Evaluator( name, valueType )
+class BooleanFunctionEvaluator[UserDofs](name : String,
+                                         val function : ( Array[Double] ) => Boolean,
+                                         val var1 : ValueSource[UserDofs], valueType : BooleanType)
+    extends Evaluator[ValueSource[UserDofs]](name, valueType) with ValueSource[UserDofs]
 {
     private val _variables = ( var1.variables ).toSeq.distinct
     
     def variables = _variables
-
     
-    def evaluate( state : EvaluationState ) : Option[BooleanValue] =
-    {
-        for( arg1 <- var1.evaluate( state ); v = function( arg1.cValue ) )
-            yield new BooleanValue( valueType, v )
-    }
+    def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => Value] =
+        var1.evaluate(state).map(dToV => x => BooleanValue(valueType, function(dToV(x).cValue)))
 }

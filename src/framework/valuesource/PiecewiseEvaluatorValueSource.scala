@@ -2,36 +2,29 @@ package framework.valuesource
 
 import fieldml.evaluator.PiecewiseEvaluator
 import fieldml.evaluator.Evaluator
-import fieldml.valueType.ValueType
+import fieldml.valueType._
 
 import framework.value.Value
 import framework.Context
 import framework.EvaluationState
 
-class PiecewiseEvaluatorValueSource( name : String, valueType : ValueType, index : Evaluator )
+class PiecewiseEvaluatorValueSource[UserDofs]( name : String, valueType : ValueType, index : ValueSource[UserDofs] )
     extends PiecewiseEvaluator( name, valueType, index )
-    with ValueSource
+    with ValueSource[UserDofs]
 {
-    override def evaluate( state : EvaluationState ) : Option[Value] =
+    override def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => Value] =
     {
-        state.pushAndApply( name, binds.toSeq )
-        
-        val value = for(
-            key <- index.evaluate( state );
-            eval <- delegations.get( key.eValue );
-            v <- eval.evaluate( state )
-            ) yield v
+      state.pushAndApply(name, binds.toSeq.map((evArg) => (evArg._1, evArg._2)))
+      val indexSF = index.evaluate(state)
+      val indexValues = index.valueType.asInstanceOf[EnsembleType].elementSet.toArray
+      val partsM = Map() ++ (for (idx <- indexValues;
+                                  eval <- delegations.get(idx);
+                                  v <- eval.evaluate(state)) yield (idx, v))
+      
+      val indexF = index.evaluate(state)
+      state.pop()
 
-        state.pop()
-
-        if( value == None )
-        {
-            val key = index.evaluate( state );
-            val eval = delegations.get( key.get.eValue );
-            println( name + " failed for key " + key + " (default: " + delegations.default + ")")
-        }
-        
-        return value
+      indexSF.map(indexF => (u : UserDofs) => partsM(indexF(u).eValue)(u))
     }
 
 }

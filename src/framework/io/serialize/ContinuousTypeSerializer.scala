@@ -26,7 +26,7 @@ object ContinuousTypeSerializer
     }
 
 
-    def extract( source : Deserializer, objectHandle : Int ) : ContinuousType =
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : ContinuousType =
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
         

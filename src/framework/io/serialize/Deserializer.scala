@@ -14,12 +14,12 @@ import fieldml.jni.FieldmlHandleType
 import fieldml.jni.FieldmlApiConstants._
 
 import framework.region.UserRegion
-import framework.valuesource.SubtypeEvaluatorValueSource
+import framework.valuesource._
 
 import util.library.ExternalEvaluatorGenerator
 import util.exception._
 
-class Deserializer( val fmlHandle : Int )
+class Deserializer[UserDofs]( val fmlHandle : Int )
 {
     private val objects = Map[Int, FieldmlObject]()
     
@@ -48,26 +48,26 @@ class Deserializer( val fmlHandle : Int )
     }
     
     
-    def getEvaluator( objectHandle : Int ) : Evaluator =
+    def getEvaluator( objectHandle : Int ) : ValueSource[UserDofs] =
     {
-        if( objects.getOrElse( objectHandle, null ).isInstanceOf[Evaluator] )
+        if( objects.getOrElse( objectHandle, null ).isInstanceOf[ValueSource[UserDofs]] )
         {
-            return objects( objectHandle ).asInstanceOf[Evaluator]
+            return objects( objectHandle ).asInstanceOf[ValueSource[UserDofs]]
         }
         
         val objectType = Fieldml_GetObjectType( fmlHandle, objectHandle )
         
         objectType match
         {
-            case FHT_REFERENCE_EVALUATOR => return getReferenceEvaluator( objectHandle )
-            case FHT_PARAMETER_EVALUATOR => return getParameterEvaluator( objectHandle )
-            case FHT_ARGUMENT_EVALUATOR => return getArgumentOrSubtypeEvaluator( objectHandle )
-            case FHT_AGGREGATE_EVALUATOR => return getAggregateEvaluator( objectHandle )
-            case FHT_PIECEWISE_EVALUATOR => return getPiecewiseEvaluator( objectHandle )
-            case FHT_EXTERNAL_EVALUATOR => return getExternalEvaluator( objectHandle )
-            case FHT_CONSTANT_EVALUATOR => return getConstantEvaluator( objectHandle )
-            case FHT_UNKNOWN => throw new FmlUnknownObjectException( objectHandle )
-            case _ => throw new FmlInvalidObjectException( Fieldml_GetObjectName( fmlHandle, objectHandle ) + " is not a known evaluator" )
+            case FHT_REFERENCE_EVALUATOR => return getReferenceEvaluator(objectHandle)
+            case FHT_PARAMETER_EVALUATOR => return getParameterEvaluator(objectHandle)
+            case FHT_ARGUMENT_EVALUATOR => return getArgumentOrSubtypeEvaluator(objectHandle)
+            case FHT_AGGREGATE_EVALUATOR => return getAggregateEvaluator(objectHandle)
+            case FHT_PIECEWISE_EVALUATOR => return getPiecewiseEvaluator(objectHandle)
+            case FHT_EXTERNAL_EVALUATOR => return getExternalEvaluator(objectHandle)
+            case FHT_CONSTANT_EVALUATOR => return getConstantEvaluator(objectHandle)
+            case FHT_UNKNOWN => throw new FmlUnknownObjectException(objectHandle)
+            case _ => throw new FmlInvalidObjectException( Fieldml_GetObjectName(fmlHandle, objectHandle) + " is not a known evaluator" )
         }
     }
     
@@ -147,7 +147,7 @@ class Deserializer( val fmlHandle : Int )
     }
     
 
-    private def getSubtypeEvaluator( objectHandle : Int ) : Option[Evaluator] =
+    private def getSubtypeEvaluator( objectHandle : Int ) : Option[ValueSource[UserDofs]] =
     {
         val name = Fieldml_GetObjectName( fmlHandle, objectHandle )
         if( name == null )
@@ -173,17 +173,17 @@ class Deserializer( val fmlHandle : Int )
         //the object should already be in the cache
         
         val superObject = objects.getOrElse( superHandle, null )
-        if( superObject == null )
+        if (superObject == null)
         {
             return None
         }
         
-        if( !superObject.isInstanceOf[Evaluator] )
+        if (!superObject.isInstanceOf[ValueSource[UserDofs]])
         {
             return None
         }
         
-        val superEval = superObject.asInstanceOf[Evaluator]
+        val superEval = superObject.asInstanceOf[ValueSource[UserDofs]]
         val vType = superEval.valueType
         if( !vType.isInstanceOf[StructuredType] )
         {
@@ -194,76 +194,88 @@ class Deserializer( val fmlHandle : Int )
     }
     
     
-    private def generateExternalEvaluator( objectHandle : Int ) : Evaluator =
+    private def generateExternalEvaluator( objectHandle : Int ) : ValueSource[UserDofs] =
     {
         getSubtypeEvaluator( objectHandle ) match
         {
-            case s : Some[Evaluator] => s.get
+            case s : Some[ValueSource[UserDofs]] => s.get
             case None => ExternalEvaluatorGenerator.generateExternalEvaluator( this, objectHandle )
         }
     }
     
-    def getExternalEvaluator( objectHandle : Int ) : Evaluator =
+    def getExternalEvaluator(objectHandle : Int) : ValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_EXTERNAL_EVALUATOR, classOf[Evaluator] ) match
+        getTypedObject(objectHandle, FHT_EXTERNAL_EVALUATOR, classOf[ValueSource[UserDofs]]) match
         {
-            case s : Some[Evaluator] => s.get
-            case None => objects( objectHandle ) = generateExternalEvaluator( objectHandle ); objects( objectHandle ).asInstanceOf[Evaluator]
+            case s : Some[ValueSource[UserDofs]] => s.get
+            case None =>
+              objects(objectHandle) = generateExternalEvaluator( objectHandle )
+              objects(objectHandle).asInstanceOf[ValueSource[UserDofs]]
         }
     }
     
     
-    def getReferenceEvaluator( objectHandle : Int ) : ReferenceEvaluator =
+    def getReferenceEvaluator(objectHandle : Int) : ReferenceEvaluatorValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_REFERENCE_EVALUATOR, classOf[ReferenceEvaluator] ) match
+        getTypedObject(objectHandle, FHT_REFERENCE_EVALUATOR, classOf[ReferenceEvaluatorValueSource[UserDofs]]) match
         {
-            case s : Some[ReferenceEvaluator] => s.get
-            case None => objects( objectHandle ) = ReferenceEvaluatorSerializer.extract( this, objectHandle ); objects( objectHandle ).asInstanceOf[ReferenceEvaluator]
+            case s : Some[ReferenceEvaluatorValueSource[UserDofs]] => s.get
+            case None =>
+              objects(objectHandle) = ReferenceEvaluatorSerializer.extract(this, objectHandle)
+              objects(objectHandle).asInstanceOf[ReferenceEvaluatorValueSource[UserDofs]]
         }
     }
     
     
-    def getConstantEvaluator( objectHandle : Int ) : ConstantEvaluator =
+    def getConstantEvaluator( objectHandle : Int ) : ConstantEvaluatorValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_CONSTANT_EVALUATOR, classOf[ConstantEvaluator] ) match
+        getTypedObject(objectHandle, FHT_CONSTANT_EVALUATOR, classOf[ConstantEvaluatorValueSource[UserDofs]]) match
         {
-            case s : Some[ConstantEvaluator] => s.get
-            case None => objects( objectHandle ) = ConstantEvaluatorSerializer.extract( this, objectHandle ); objects( objectHandle ).asInstanceOf[ConstantEvaluator]
+            case s : Some[ConstantEvaluatorValueSource[UserDofs]] => s.get
+            case None =>
+              objects(objectHandle) = ConstantEvaluatorSerializer.extract(this, objectHandle)
+              objects(objectHandle).asInstanceOf[ConstantEvaluatorValueSource[UserDofs]]
         }
     }
     
     
-    def getParameterEvaluator( objectHandle : Int ) : ParameterEvaluator =
+    def getParameterEvaluator(objectHandle : Int) : ParameterEvaluatorValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_PARAMETER_EVALUATOR, classOf[ParameterEvaluator] ) match
+        getTypedObject( objectHandle, FHT_PARAMETER_EVALUATOR, classOf[ParameterEvaluatorValueSource[UserDofs]] ) match
         {
-            case s : Some[ParameterEvaluator] => s.get
-            case None => objects( objectHandle ) = ParameterEvaluatorSerializer.extract( this, objectHandle ); objects( objectHandle ).asInstanceOf[ParameterEvaluator]
+            case s : Some[ParameterEvaluatorValueSource[UserDofs]] => s.get
+            case None =>
+              objects( objectHandle ) = ParameterEvaluatorSerializer.extract(this, objectHandle)
+              objects( objectHandle ).asInstanceOf[ParameterEvaluatorValueSource[UserDofs]]
         }
     }
     
     
-    def getAggregateEvaluator( objectHandle : Int ) : AggregateEvaluator =
+    def getAggregateEvaluator(objectHandle : Int) : AggregateEvaluatorValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_AGGREGATE_EVALUATOR, classOf[AggregateEvaluator] ) match
+        getTypedObject( objectHandle, FHT_AGGREGATE_EVALUATOR, classOf[AggregateEvaluatorValueSource[UserDofs]]) match
         {
-            case s : Some[AggregateEvaluator] => s.get
-            case None => objects( objectHandle ) = AggregateEvaluatorSerializer.extract( this, objectHandle ); objects( objectHandle ).asInstanceOf[AggregateEvaluator]
+            case s : Some[AggregateEvaluatorValueSource[UserDofs]] => s.get
+            case None => objects( objectHandle ) =
+              AggregateEvaluatorSerializer.extract(this, objectHandle)
+              objects( objectHandle ).asInstanceOf[AggregateEvaluatorValueSource[UserDofs]]
         }
     }
     
     
-    def getPiecewiseEvaluator( objectHandle : Int ) : PiecewiseEvaluator =
+    def getPiecewiseEvaluator(objectHandle : Int) : PiecewiseEvaluatorValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_PIECEWISE_EVALUATOR, classOf[PiecewiseEvaluator] ) match
+        getTypedObject( objectHandle, FHT_PIECEWISE_EVALUATOR, classOf[PiecewiseEvaluatorValueSource[UserDofs]]) match
         {
-            case s : Some[PiecewiseEvaluator] => s.get
-            case None => objects( objectHandle ) = PiecewiseEvaluatorSerializer.extract( this, objectHandle ); objects( objectHandle ).asInstanceOf[PiecewiseEvaluator]
+            case s : Some[PiecewiseEvaluatorValueSource[UserDofs]] => s.get
+            case None => objects( objectHandle ) =
+              PiecewiseEvaluatorSerializer.extract( this, objectHandle )
+              objects(objectHandle).asInstanceOf[PiecewiseEvaluatorValueSource[UserDofs]]
         }
     }
     
 
-    private def addEvaluator( objectHandle : Int, eval : Evaluator ) : Unit =
+    private def addEvaluator(objectHandle : Int, eval : ValueSource[UserDofs]) : Unit =
     {
         objects( objectHandle ) = eval
         
@@ -278,26 +290,30 @@ class Deserializer( val fmlHandle : Int )
     }
     
     
-    def getArgumentEvaluator( objectHandle : Int ) : ArgumentEvaluator =
+    def getArgumentEvaluator(objectHandle : Int) : ArgumentEvaluatorValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_ARGUMENT_EVALUATOR, classOf[ArgumentEvaluator] ) match
+        getTypedObject( objectHandle, FHT_ARGUMENT_EVALUATOR, classOf[ArgumentEvaluatorValueSource[UserDofs]]) match
         {
-            case s : Some[ArgumentEvaluator] => s.get
-            case None => addEvaluator( objectHandle, ArgumentEvaluatorSerializer.extract( this, objectHandle ) ); objects( objectHandle ).asInstanceOf[ArgumentEvaluator]
+            case s : Some[ArgumentEvaluatorValueSource[UserDofs]] => s.get
+            case None =>
+              addEvaluator( objectHandle, ArgumentEvaluatorSerializer.extract( this, objectHandle ) )
+              objects( objectHandle ).asInstanceOf[ArgumentEvaluatorValueSource[UserDofs]]
         }
     }
     
     
-    def getArgumentOrSubtypeEvaluator( objectHandle : Int ) : Evaluator =
+    def getArgumentOrSubtypeEvaluator( objectHandle : Int ) : ValueSource[UserDofs] =
     {
-        getTypedObject( objectHandle, FHT_ARGUMENT_EVALUATOR, classOf[ArgumentEvaluator] ) match
+        getTypedObject( objectHandle, FHT_ARGUMENT_EVALUATOR, classOf[ArgumentEvaluatorValueSource[UserDofs]]) match
         {
-            case s : Some[ArgumentEvaluator] => s.get
+            case s : Some[ArgumentEvaluatorValueSource[UserDofs]] => s.get
             case None => {
                 getSubtypeEvaluator( objectHandle ) match
                 {
-                    case s : Some[SubtypeEvaluator] => objects( objectHandle ) = s.get; s.get
-                    case None => addEvaluator( objectHandle, ArgumentEvaluatorSerializer.extract( this, objectHandle ) ); objects( objectHandle ).asInstanceOf[ArgumentEvaluator]
+                    case s : Some[SubtypeEvaluatorValueSource[UserDofs]] => objects(objectHandle) = s.get; s.get
+                    case None =>
+                      addEvaluator(objectHandle, ArgumentEvaluatorSerializer.extract(this, objectHandle))
+                      objects(objectHandle).asInstanceOf[ArgumentEvaluatorValueSource[UserDofs]]
                 }
             }
         }
@@ -306,21 +322,21 @@ class Deserializer( val fmlHandle : Int )
     
     private def getTypedObject[A <: FieldmlObject]( objectHandle : Int, objectType : FieldmlHandleType, clazz : Class[A] ) : Option[A] =
     {
-        val actualObjectType = Fieldml_GetObjectType( fmlHandle, objectHandle )
-        val name = Fieldml_GetObjectName( fmlHandle, objectHandle )
+        val actualObjectType = Fieldml_GetObjectType(fmlHandle, objectHandle)
+        val name = Fieldml_GetObjectName(fmlHandle, objectHandle)
         
-        if( actualObjectType != objectType )
+        if (actualObjectType != objectType)
         {
-            Fieldml_GetLastError( fmlHandle ) match
+            Fieldml_GetLastError(fmlHandle) match
             {
-                case FML_ERR_UNKNOWN_OBJECT => throw new FmlUnknownObjectException( objectHandle )
-                case _ => throw new FmlTypeException( name, actualObjectType, objectType )
+                case FML_ERR_UNKNOWN_OBJECT => throw new FmlUnknownObjectException(objectHandle)
+                case _ => throw new FmlTypeException(name, actualObjectType, objectType)
             }
         }
         
         try
         {
-            objects.get( objectHandle ) match
+            objects.get(objectHandle) match
             {
                 case s : Some[_] =>
                 {

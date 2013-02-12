@@ -8,26 +8,16 @@ import framework.value.ContinuousValue
 import framework.ParamSwizzle
 import framework.EvaluationState
 
-class ParamSwizzleValueSource( name : String, valueType : ValueType, source : Evaluator, swizzle : Array[Int] )
-    extends ParamSwizzle( name, valueType, source, swizzle )
-    with ValueSource
+class ParamSwizzleValueSource[UserDofs](name : String, valueType : ValueType, source : ValueSource[UserDofs], swizzle : Array[Int])
+    extends ParamSwizzle(name, valueType, source, swizzle)
+    with ValueSource[UserDofs]
 {
     private val buffer = new Array[Double]( swizzle.size )
     
-    def evaluate( state : EvaluationState ) : Option[ContinuousValue] =
-    {
-        val rawVal = source.evaluate( state )
-        
-        if( rawVal == None )
-        {
-            return None
-        }
-        
-        for( i <- 0 until swizzle.size )
-        {
-            buffer( i ) = rawVal.get.cValue( swizzle( i ) - 1 )
-        }
-        
-        return new Some( new ContinuousValue( valueType.asInstanceOf[ContinuousType], buffer ) )
-    }
+    override def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => ContinuousValue] =
+      source.evaluate(state).map(rawVal => (x : UserDofs) => {
+          for (i <- 0 until swizzle.size)
+            buffer(i) = rawVal(x).cValue(swizzle(i) - 1)
+          new ContinuousValue(valueType.asInstanceOf[ContinuousType], buffer)
+        })
 }

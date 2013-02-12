@@ -19,6 +19,8 @@ import util.exception._
 import fieldml.jni.FieldmlApi._
 import fieldml.jni.FieldmlApiConstants._
 
+import framework.valuesource.ValueSource
+
 package object serialize
 {
     def GetNamedObject( handle : Int, name : String ) : Int =
@@ -34,7 +36,7 @@ package object serialize
     }
     
     
-    def GetBinds( source : Deserializer, objectHandle : Int ) : Seq[Tuple2[Evaluator, Evaluator]] =
+    def GetBinds[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) : Seq[(ValueSource[UserDofs], ValueSource[UserDofs])] =
     {
         val bindCount = Fieldml_GetBindCount( source.fmlHandle, objectHandle )
         
@@ -46,15 +48,15 @@ package object serialize
     }
     
 
-    implicit def continuousTypeSerializer( valueType : ContinuousType ) = ContinuousTypeSerializer
-    implicit def ensembleTypeSerializer( valueType : EnsembleType ) = EnsembleTypeSerializer
-    implicit def meshTypeSerializer( valueType : MeshType ) = MeshTypeSerializer
-    implicit def booleanTypeSerializer( valueType : BooleanType ) = BooleanTypeSerializer
-    implicit def dataResourceSerializer( dataResource : DataResource ) = DataResourceSerializer
-    implicit def argumentEvaluatorSerializer( evaluator : ArgumentEvaluator ) = ArgumentEvaluatorSerializer
-    implicit def piecewiseEvaluatorSerializer( evaluator : PiecewiseEvaluator ) = PiecewiseEvaluatorSerializer
-    implicit def parameterEvaluatorSerializer( evaluator : ParameterEvaluator ) = ParameterEvaluatorSerializer
-    implicit def aggregateEvaluatorSerializer( evaluator : AggregateEvaluator ) = AggregateEvaluatorSerializer
-    implicit def referenceEvaluatorSerializer( evaluator : ReferenceEvaluator ) = ReferenceEvaluatorSerializer
-    implicit def constantEvaluatorSerializer( evaluator : ConstantEvaluator ) = ConstantEvaluatorSerializer
+    implicit def continuousTypeSerializer(valueType : ContinuousType) = ContinuousTypeSerializer
+    implicit def ensembleTypeSerializer(valueType : EnsembleType) = EnsembleTypeSerializer
+    implicit def meshTypeSerializer(valueType : MeshType) = MeshTypeSerializer
+    implicit def booleanTypeSerializer(valueType : BooleanType) = BooleanTypeSerializer
+    implicit def dataResourceSerializer(dataResource : DataResource) = DataResourceSerializer
+    implicit def argumentEvaluatorSerializer[EvalType <: Evaluator[EvalType]](evaluator : ArgumentEvaluator[EvalType]) = ArgumentEvaluatorSerializer
+    implicit def piecewiseEvaluatorSerializer[EvalType <: Evaluator[EvalType]](evaluator : PiecewiseEvaluator[EvalType]) = PiecewiseEvaluatorSerializer
+    implicit def parameterEvaluatorSerializer[EvalType <: Evaluator[EvalType]](evaluator : ParameterEvaluator[EvalType]) = ParameterEvaluatorSerializer
+    implicit def aggregateEvaluatorSerializer[EvalType <: Evaluator[EvalType]](evaluator : AggregateEvaluator[EvalType]) = AggregateEvaluatorSerializer
+    implicit def referenceEvaluatorSerializer[EvalType <: Evaluator[EvalType]](evaluator : ReferenceEvaluator[EvalType]) = ReferenceEvaluatorSerializer
+    implicit def constantEvaluatorSerializer[EvalType <: Evaluator[EvalType]](evaluator : ConstantEvaluator[EvalType]) = ConstantEvaluatorSerializer
 }

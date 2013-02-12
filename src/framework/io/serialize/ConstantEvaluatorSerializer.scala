@@ -11,21 +11,21 @@ import fieldml.jni.FieldmlHandleType._
 import fieldml.jni.FieldmlApiConstants._
 
 import framework.region.UserRegion
-import framework.valuesource.ConstantEvaluatorValueSource
+import framework.valuesource._
 
 
 object ConstantEvaluatorSerializer
 {
-    def insert( handle : Int, evaluator : ConstantEvaluator ) : Unit =
+    def insert[UserDofs](handle : Int, evaluator : ConstantEvaluator[ValueSource[UserDofs]]) : Unit =
     {
-        val valueHandle = GetNamedObject( handle, evaluator.valueType.name )
+        val valueHandle = GetNamedObject(handle, evaluator.valueType.name)
         
-        var objectHandle = Fieldml_CreateConstantEvaluator( handle, evaluator.name, evaluator.valueString, valueHandle );
+        var objectHandle = Fieldml_CreateConstantEvaluator(handle, evaluator.name, evaluator.valueString, valueHandle);
     }
 
     
-    def extract( source : Deserializer, objectHandle : Int ) :
-        ConstantEvaluator = 
+    def extract[UserDofs](source : Deserializer[UserDofs], objectHandle : Int) :
+        ConstantEvaluatorValueSource[UserDofs] = 
     {
         val name = Fieldml_GetObjectName( source.fmlHandle, objectHandle )
 
@@ -35,7 +35,7 @@ object ConstantEvaluatorSerializer
         
         val valueType : ValueType = source.getType( typeHandle )
         
-        val constantEval = new ConstantEvaluatorValueSource( name, valueString, valueType )
+        val constantEval = new ConstantEvaluatorValueSource[UserDofs]( name, valueString, valueType )
         
         constantEval
     }
