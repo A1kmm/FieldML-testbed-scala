@@ -14,17 +14,17 @@ class PiecewiseEvaluatorValueSource[UserDofs]( name : String, valueType : ValueT
 {
     override def evaluate(state : EvaluationState[UserDofs]) : Option[UserDofs => Value] =
     {
-      state.pushAndApply(name, binds.toSeq.map((evArg) => (evArg._1, evArg._2)))
+      state.pushAndApply(name, binds.toSeq)
       val indexSF = index.evaluate(state)
       val indexValues = index.valueType.asInstanceOf[EnsembleType].elementSet.toArray
       val partsM = Map() ++ (for (idx <- indexValues;
-                                  eval <- delegations.get(idx);
+                                  eval <- delegations.getNoDefault(idx);
                                   v <- eval.evaluate(state)) yield (idx, v))
-      
+      val defaultEval = for (eval <- delegations.default; v <- eval.evaluate(state)) yield v
+
       val indexF = index.evaluate(state)
       state.pop()
 
-      indexSF.map(indexF => (u : UserDofs) => partsM(indexF(u).eValue)(u))
+      indexSF.map(indexF => (u : UserDofs) => partsM.getOrElse(indexF(u).eValue, defaultEval.get)(u))
     }
-
 }

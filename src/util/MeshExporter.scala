@@ -29,7 +29,7 @@ abstract class MeshExporter
                                  polygonBlock : StringBuilder, shape : String,
                                  polygonCount : Int, nodeCount : Int,
                                  vertexCount : Int, xyzArrayCount : Int,
-                                 interpolator : String) : String =
+                                 interpolator : String, localNodeCount : Int) : String =
     {
         def replacements(m : Regex.Match) : String =
           {
@@ -42,6 +42,7 @@ abstract class MeshExporter
               case "xyzArrayCount" => ("" + xyzArrayCount)
               case "shape"         => shape
               case "interpolator"  => interpolator
+              case "localNodeCount"=> ("" + localNodeCount)
               case "nodeCount"     => ("" + nodeCount)
               case _               => ""
             }
@@ -210,10 +211,12 @@ abstract class MeshExporter
       var usedNodes = Map[(Double, Double, Double),Int]()
       var nextNodeID = 1
       def idForNode(p : (Double, Double, Double)) : Int =
-        if (usedNodes.contains(p))
+        if (usedNodes.contains(p)) {
           usedNodes(p)
+        }
         else {
           val newNodeID = nextNodeID
+          xyzArray.append("\n" + p._1 + " " + p._2 + " " + p._3)
           nextNodeID = nextNodeID + 1
           usedNodes = usedNodes + ((p, newNodeID))
           newNodeID
@@ -293,7 +296,10 @@ abstract class MeshExporter
         val xyzArrayCount = vertexCount * 3
         fillInTemplate(outputName, xyzArray, polygonBlock, shape,
                        polygonCount * (if (wantVolumeMesh) 1 else 2), nodeCount,
-                       vertexCount, xyzArrayCount, "trilinearLagrange")
+                       vertexCount, xyzArrayCount,
+                       if (shape == "shape.unit.cube") "trilinearLagrange" else "trilinearSimplex",
+                       if (shape == "shape.unit.cube") 8 else 4
+                      )
     }
 
     def export3DFromFieldMLBind2Meshes(
@@ -365,6 +371,6 @@ abstract class MeshExporter
 
         fillInTemplate(outputName, xyzArray, polygonBlock, shape, polygonCount,
                        nodeCount, vertexCount, xyzArrayCount,
-                       "trilinearLagrange")
+                       "trilinearLagrange", 8)
     }
 }

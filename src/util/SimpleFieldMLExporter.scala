@@ -73,14 +73,14 @@ object SimpleFieldMLExporter extends MeshExporter
   </DataResourceDescription>
   <ArrayDataSource name="$name.nodes.connectivity.data" location="1" rank="2">
     <RawArraySize>
-      $polygonCount 8
+      $polygonCount $localNodeCount
     </RawArraySize>
   </ArrayDataSource>
 </DataResource>
 
 <!-- define mapping from element*localnode to global index from ensemble
   "$name.nodes.argument". "interp.points" are documented
-  as being the 8 corner points of a unit cube at chart locations:
+  as being the $localNodeCount corner points of a $shape at chart locations:
   (0,0,0), (1,0,0), (0,1,0), (1,1,0), (0,0,1), (1,0,1), (0,1,1), (1,1,1) -->
 <ParameterEvaluator name="$name.interp.connectivity" valueType="$name.nodes">
   <DenseArrayData data="$name.nodes.connectivity.data">

@@ -421,8 +421,8 @@ object ParameterEvaluatorSerializer
         
         if( valueType.isInstanceOf[EnsembleType] )
         {
-            val generator : ( ValueType, Int* ) => Value = ( a, b ) => Value.apply( a, b.map( _.toDouble ):_* ) 
-            initializeDenseValues( source, reader, dense, Fieldml_ReadIntSlab, generator )
+            val generator : (ValueType, Int*) => Value = (a, b) => Value.apply(a, b.map(_.toDouble):_*) 
+            initializeDenseValues(source, reader, dense, Fieldml_ReadIntSlab, generator)
         }
         else if( valueType.isInstanceOf[ContinuousType] )
         {
