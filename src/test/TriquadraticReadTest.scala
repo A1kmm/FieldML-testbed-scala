@@ -18,7 +18,7 @@ object TriquadraticReadTest
 {
     def main( argv : Array[String] ) : Unit =
     {
-        val configStrings = Tuple4( "input/triquadratic heart test.xml", "heart.mesh.type", "heart.mesh.argument", "heart.coordinates" )
+        val configStrings = ("input/triquadratic heart test.xml", "heart.mesh.type", "heart.mesh.argument", List("heart.coordinates"))
         
         // configStrings = Tuple4( "input\\StaticAdvectionDiffusion.xml", "static_advection_diffusion.mesh", "static_advection_diffusion.mesh.argument", "static_advection_diffusion.geometric" )
         
@@ -27,7 +27,7 @@ object TriquadraticReadTest
         val meshType : MeshType = region.getObject( configStrings._2 )
         val meshArgument : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( configStrings._3 )
 
-        val coordinates : ValueSource[MeshValue] = region.getObject( configStrings._4 )
+        val coordinates : ValueSource[MeshValue] = region.getObject( configStrings._4(0) )
         
         val triquadNodes : ParameterEvaluatorValueSource[MeshValue] = region.getObject( "heart.node.coordinates" )
         val nodeArgument : ArgumentEvaluatorValueSource[MeshValue] = region.getObject( "heart.nodes.argument" )

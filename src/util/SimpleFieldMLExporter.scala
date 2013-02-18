@@ -92,7 +92,7 @@ object SimpleFieldMLExporter extends MeshExporter
 </ParameterEvaluator>
 
 <!-- construct a vector of node parameters to pass on to
-  "$name.trilinear.interpolator" -->
+  "$name.interpolator" -->
 <AggregateEvaluator name="$name.interp.parameters"
     valueType="interp.parameters">
   <Bindings>
@@ -102,10 +102,10 @@ object SimpleFieldMLExporter extends MeshExporter
   <ComponentEvaluators default="$name.node.dofs.argument" />
 </AggregateEvaluator>
 
-<!-- define evaluator returning value of library trilinear Lagrange interpolator
+<!-- define evaluator returning value of library the interpolator
   at the element chart location of mesh type "$name.mesh" and using parameters
   from evaluator "$name.interp.parameters". -->
-<ReferenceEvaluator name="$name.trilinear.interpolator"
+<ReferenceEvaluator name="$name.interpolator"
     evaluator="interp.interpolator" valueType="real.type">
   <Bindings>
     <Bind argument="chart.3d.argument" source="$name.mesh.argument.chart" />
@@ -118,35 +118,35 @@ object SimpleFieldMLExporter extends MeshExporter
   It is a template for a field defined over the mesh represented by
   "$name.mesh.argument", with the unbound parameter source
   "$name.node.dofs.argument" inherited from delegate evaluator
-  "$name.trilinear.interpolator" -->
-<PiecewiseEvaluator name="$name.template.trilinear" valueType="real.type">
+  "$name.interpolator" -->
+<PiecewiseEvaluator name="$name.template.interp" valueType="real.type">
   <IndexEvaluators>
     <IndexEvaluator evaluator="$name.mesh.argument.elements" indexNumber="1" />
   </IndexEvaluators>
-  <EvaluatorMap default="$name.trilinear.interpolator" />
+  <EvaluatorMap default="$name.interpolator" />
 </PiecewiseEvaluator>
 
+$fields"""
+
+  override val vectorField = """
 <!-- inline data resource listing raw values for the $vertexCount nodes * 3 components
-  of the 'coordinates' field. ParameterEvaluator "$name.node.coordinates"
+  of the '$field' field. ParameterEvaluator "$name.node.$field"
   gives the data semantic meaning. -->
-<DataResource name="$name.coordinates.resource">
+<DataResource name="$name.$field.resource">
   <DataResourceDescription>
     <DataResourceString>
 $xyzArray
     </DataResourceString>
   </DataResourceDescription>
-  <ArrayDataSource name="$name.coordinates.data" location="1" rank="2">
+  <ArrayDataSource name="$name.$field.data" location="1" rank="2">
     <RawArraySize>
       $vertexCount 3
     </RawArraySize>
   </ArrayDataSource>
 </DataResource>
 
-<!-- parameters for the coordinate field, listing a scalar real parameter
-  for all permutations of library 3-component ensemble
-  "coordinates.rc.3d.component" and $vertexCount-member ensemble "$name.nodes.argument" -->
-<ParameterEvaluator name="$name.node.coordinates" valueType="real.type">
-  <DenseArrayData data="$name.coordinates.data">
+<ParameterEvaluator name="$name.node.$field" valueType="real.type">
+  <DenseArrayData data="$name.$field.data">
     <DenseIndexes>
       <IndexEvaluator evaluator="$name.nodes.argument" />
       <IndexEvaluator evaluator="coordinates.rc.3d.component.argument" />
@@ -159,16 +159,57 @@ $xyzArray
   same evaluator in this example, they produce different values because the
   parameters on which they depend vary with the same component ensemble
   argument ("coordinates.rc.3d.component.argument"). -->
-<AggregateEvaluator name="coordinates" valueType="coordinates.rc.3d">
+<AggregateEvaluator name="$field" valueType="coordinates.rc.3d">
   <Bindings>
     <BindIndex argument="coordinates.rc.3d.component.argument" indexNumber="1" />
-    <Bind argument="$name.node.dofs.argument" source="$name.node.coordinates" />
+    <Bind argument="$name.node.dofs.argument" source="$name.node.$field" />
   </Bindings>
-  <ComponentEvaluators default="$name.template.trilinear" />
+  <ComponentEvaluators default="$name.template.interp" />
 </AggregateEvaluator>
 
 </Region>
 </Fieldml>"""
+
+  override val scalarField = """
+<!-- inline data resource listing raw values for the $vertexCount nodes
+  of the '$field' field. ParameterEvaluator "$name.node.$field"
+  gives the data semantic meaning. -->
+<DataResource name="$name.$field.resource">
+  <DataResourceDescription>
+    <DataResourceString>
+$xyzArray
+    </DataResourceString>
+  </DataResourceDescription>
+  <ArrayDataSource name="$name.$field.data" location="1" rank="1">
+    <RawArraySize>
+      $vertexCount
+    </RawArraySize>
+  </ArrayDataSource>
+</DataResource>
+
+<ParameterEvaluator name="$name.node.$field" valueType="real.type">
+  <DenseArrayData data="$name.$field.data">
+    <DenseIndexes>
+      <IndexEvaluator evaluator="$name.nodes.argument" />
+      <IndexEvaluator evaluator="coordinates.rc.3d.component.argument" />
+    </DenseIndexes>
+  </DenseArrayData>
+</ParameterEvaluator>
+
+<!-- define the final vector coordinates field by aggregating evaluators for
+  each component of the vector valueType. Although each component uses the
+  same evaluator in this example, they produce different values because the
+  parameters on which they depend vary with the same component ensemble
+  argument ("coordinates.rc.3d.component.argument"). -->
+<ReferenceEvaluator name="$field" evaluator="$name.template.interp" valueType="coordinates.rc.3d"> <!-- TODO - sort out valueType here. -->
+  <Bindings>
+    <Bind argument="$name.node.dofs.argument" source="$name.node.$field" />
+  </Bindings>
+</AggregateEvaluator>
+
+</Region>
+</Fieldml>"""
+
     override val openPolygon = ""
     override val closePolygon = "\n"
 }

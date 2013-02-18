@@ -20,16 +20,21 @@ import scala.util.matching._
 abstract class MeshExporter
 {
     protected val rawXml : String
+    protected val scalarField : String = ""
+    protected val vectorField : String = ""
     protected val openPolygon : String
     protected val closePolygon : String
     protected val wantVolumeMesh : Boolean = false
     protected val startIndicesAt : Int = 0
 
-    protected def fillInTemplate(outputName : String, xyzArray : StringBuilder,
-                                 polygonBlock : StringBuilder, shape : String,
-                                 polygonCount : Int, nodeCount : Int,
-                                 vertexCount : Int, xyzArrayCount : Int,
-                                 interpolator : String, localNodeCount : Int) : String =
+    protected def fillInTemplate(
+      raw : String,
+      outputName : String, xyzArray : StringBuilder,
+      polygonBlock : StringBuilder, shape : String,
+      polygonCount : Int, nodeCount : Int,
+      vertexCount : Int, xyzArrayCount : Int,
+      interpolator : String, localNodeCount : Int,
+      fields : StringBuilder, field : String) : String =
     {
         def replacements(m : Regex.Match) : String =
           {
@@ -44,10 +49,12 @@ abstract class MeshExporter
               case "interpolator"  => interpolator
               case "localNodeCount"=> ("" + localNodeCount)
               case "nodeCount"     => ("" + nodeCount)
+              case "fields"        => fields.toString()
+              case "field"         => field
               case _               => ""
             }
           }
-        """\$([A-Z|a-z]+)""".r.replaceAllIn(rawXml, replacements(_))
+        """\$([A-Z|a-z]+)""".r.replaceAllIn(raw, replacements(_))
     }
 
     protected def formatTriple(value : Value) : String =
@@ -127,15 +134,15 @@ abstract class MeshExporter
     private def subdivide3D(
         region : Region[MeshValue],
         meshVariable : ArgumentEvaluatorValueSource[MeshValue],
-        meshEvaluator : ValueSource[MeshValue],
+        meshEvaluators : List[ValueSource[MeshValue]],
         polygonBlock : StringBuilder,
-        xyzArray : StringBuilder,
+        xyzArrays : List[StringBuilder],
         discretisation : Int,
         elementCount : Int
       ) = {
 
         region.bind(meshVariable, (x : MeshValue) => x)
-        val Some(f) = region.evaluate(meshEvaluator)
+        val fs = meshEvaluators.map(meshEvaluator => region.evaluate(meshEvaluator).get)
 
         for (elementNumber <- 1 to elementCount)
         {
@@ -147,14 +154,19 @@ abstract class MeshExporter
                     val xi1 : Double = i * 1.0 / discretisation
                     val xi2 : Double = j * 1.0 / discretisation
                     
-                    val value = f(new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, xi1, xi2, 0))
-                    xyzArray.append(formatTriple(value))
-
-                    val value2 = f(new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, xi1, xi2, 1))
-                    xyzArray.append(formatTriple(value2))
+                    val mv1 : MeshValue = new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, xi1, xi2, 0)
+                    val mv2 : MeshValue = new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, xi1, xi2, 1)
+                    
+                    fs.zip(xyzArrays).map(fa => {
+                      val value = fa._1(mv1)
+                      fa._2.append(formatTriple(value))
+                    
+                      val value2 = fa._1(mv2)
+                      fa._2.append(formatTriple(value2))
+                    })
                 }
             }
-            xyzArray.append("\n")
+            xyzArrays.map(xyzArray => xyzArray.append("\n"))
 
             val nodeOffsetOfElement = (elementNumber - 1) * (discretisation + 1) * (discretisation + 1)
             for (i <- 0 until discretisation)
@@ -202,21 +214,30 @@ abstract class MeshExporter
     private def simplifyOnly3D(
         region : Region[MeshValue],
         meshVariable : ArgumentEvaluatorValueSource[MeshValue],
-        meshEvaluator : ValueSource[MeshValue],
+        meshEvaluators : List[ValueSource[MeshValue]],
         polygonBlock : StringBuilder,
-        xyzArray : StringBuilder,
+        xyzArrays : List[StringBuilder],
         shape : String,
         elementCount : Int
       ) = {
       var usedNodes = Map[(Double, Double, Double),Int]()
       var nextNodeID = 1
-      def idForNode(p : (Double, Double, Double)) : Int =
+      def idForNode(meshp : MeshValue, otherEvals : List[(MeshValue => Value, StringBuilder)], p : (Double, Double, Double)) : Int =
         if (usedNodes.contains(p)) {
           usedNodes(p)
         }
         else {
           val newNodeID = nextNodeID
-          xyzArray.append("\n" + p._1 + " " + p._2 + " " + p._3)
+          xyzArrays(0).append("\n" + p._1 + " " + p._2 + " " + p._3)
+          otherEvals.map(otherEval => {
+            otherEval._2.append(
+              "\n" +
+              (otherEval._1(meshp) match {
+                case value : ContinuousValue =>
+                  value.value(0) + " " + value.value(1) + " " + value.value(2)
+                case _           => " 0"
+              }))
+          })
           nextNodeID = nextNodeID + 1
           usedNodes = usedNodes + ((p, newNodeID))
           newNodeID
@@ -244,16 +265,17 @@ abstract class MeshExporter
       val pPerEl = nPoints.size
 
       region.bind(meshVariable, (x : MeshValue) => x)
-      val Some(f) = region.evaluate(meshEvaluator)
+      val fs = meshEvaluators.map(meshEvaluator => region.evaluate(meshEvaluator).get)
 
       for (elementNumber <- 1 to elementCount) {
         polygonBlock.append(openPolygon)
         nPoints.foreach(p => {
+          val meshp = new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, p._1, p._2, p._3)
           polygonBlock.append(
-            f(new MeshValue(meshVariable.valueType.asInstanceOf[MeshType], elementNumber, p._1, p._2, p._3)) match {
-              case value : ContinuousValue =>
-                " " + idForNode((value.value(0), value.value(1), value.value(2)))
-              case _           => " 0"
+            fs(0)(meshp) match {
+                  case value : ContinuousValue =>
+                    " " + idForNode(meshp, fs.drop(1).zip(xyzArrays.drop(1)), (value.value(0), value.value(1), value.value(2)))
+                    case _           => " 0"
             })
         })
         polygonBlock.append(closePolygon)
@@ -265,17 +287,17 @@ abstract class MeshExporter
     def export3DFromFieldML(
       outputName : String,
       region : Region[MeshValue], discretisation : Int,
-      meshName : String, evaluatorName : String
+      meshName : String, evaluatorNames : List[String]
     ) : String =
     {
         val meshVariable : ArgumentEvaluatorValueSource[MeshValue] = region.getObject(meshName)
         val meshType = meshVariable.valueType.asInstanceOf[MeshType]
-        val meshEvaluator : ValueSource[MeshValue] = region.getObject(evaluatorName)
+        val meshEvaluators : List[ValueSource[MeshValue]] = evaluatorNames.map((evaluatorName : String) => region.getObject(evaluatorName))
         val elementCount = meshType.elementType.elementCount
 
         val (shape : String, nodeCount : Int) = getLibraryShapeName[MeshValue](meshVariable)
 
-        val xyzArray = new StringBuilder()
+        val xyzArrays = meshEvaluators.foldLeft(List[StringBuilder]())((l : List[StringBuilder], _) => (new StringBuilder())::l)
         val polygonBlock = new StringBuilder()
 
         if (shape != "shape.unit.cube" && discretisation != 1)
@@ -285,20 +307,36 @@ abstract class MeshExporter
 
         val (polygonCount, vertexCount) =
           if (discretisation == 1) {
-            simplifyOnly3D(region, meshVariable, meshEvaluator, polygonBlock, xyzArray, shape, elementCount)
+            simplifyOnly3D(region, meshVariable, meshEvaluators, polygonBlock, xyzArrays, shape, elementCount)
           } else {
-            subdivide3D(region, meshVariable, meshEvaluator, polygonBlock,
-                        xyzArray, discretisation, elementCount)
+            subdivide3D(region, meshVariable, meshEvaluators, polygonBlock,
+                        xyzArrays, discretisation, elementCount)
             (discretisation * discretisation * elementCount,
              2 * (discretisation + 1) * (discretisation + 1) * elementCount)
           }
 
         val xyzArrayCount = vertexCount * 3
-        fillInTemplate(outputName, xyzArray, polygonBlock, shape,
+
+        val fields : StringBuilder = new StringBuilder()
+
+        xyzArrays.zip(evaluatorNames).map(
+          ((xyzArray : StringBuilder, field : String) => {
+            fields.append(
+              fillInTemplate(vectorField, outputName, xyzArray, polygonBlock, shape,
+                             polygonCount * (if (wantVolumeMesh) 1 else 2), nodeCount,
+                             vertexCount, xyzArrayCount,
+                             if (shape == "shape.unit.cube") "trilinearLagrange" else "trilinearSimplex",
+                             if (shape == "shape.unit.cube") 8 else 4, new StringBuilder(), field
+                            )
+            )
+            ()
+          }).tupled)
+
+        fillInTemplate(rawXml, outputName, new StringBuilder(), polygonBlock, shape,
                        polygonCount * (if (wantVolumeMesh) 1 else 2), nodeCount,
                        vertexCount, xyzArrayCount,
                        if (shape == "shape.unit.cube") "trilinearLagrange" else "trilinearSimplex",
-                       if (shape == "shape.unit.cube") 8 else 4
+                       if (shape == "shape.unit.cube") 8 else 4, fields, ""
                       )
     }
 
@@ -369,8 +407,8 @@ abstract class MeshExporter
         val vertexCount = (discretisation + 1) * (discretisation + 1) * elementNumber
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, shape, polygonCount,
+        fillInTemplate(rawXml, outputName, xyzArray, polygonBlock, shape, polygonCount,
                        nodeCount, vertexCount, xyzArrayCount,
-                       "trilinearLagrange", 8)
+                       "trilinearLagrange", 8, new StringBuilder(), "")
     }
 }

@@ -64,27 +64,7 @@ object ColladaExporter extends MeshExporter
         </material>
     </library_materials>
     <library_geometries>
-        <geometry id="$name_Geometry" name="$name_Geometry">
-            <mesh>
-                <source id="$name_Position">
-                    <float_array count="xyzArrayCount" id="$name_Position-array">$xyzArray</float_array>
-                    <technique_common>
-                        <accessor count="vertexCount" source="#$name_Position-array" stride="3">
-                            <param type="float" name="X"></param>
-                            <param type="float" name="Y"></param>
-                            <param type="float" name="Z"></param>
-                        </accessor>
-                    </technique_common>
-                </source>
-                <vertices id="$name_Vertex">
-                    <input semantic="POSITION" source="#$name_Position"/>
-                </vertices>
-                <polygons count="polygonCount" material="$name_Material">
-                    <input offset="0" semantic="VERTEX" source="#$name_Vertex"/>
-$polygonBlock
-                </polygons>
-            </mesh>
-        </geometry>
+      $fields
     </library_geometries>
     <library_visual_scenes>
         <visual_scene id="$name_Scene" name="$name_Scene">
@@ -110,6 +90,30 @@ $polygonBlock
         <instance_visual_scene url="#$name_Scene"/>
     </scene>
 </COLLADA>    		
+  """
+
+  override val vectorField = """
+        <geometry id="$name_Geometry" name="$name_Geometry">
+            <mesh>
+                <source id="$name_Position">
+                    <float_array count="xyzArrayCount" id="$name_Position-array">$xyzArray</float_array>
+                    <technique_common>
+                        <accessor count="vertexCount" source="#$name_Position-array" stride="3">
+                            <param type="float" name="X"></param>
+                            <param type="float" name="Y"></param>
+                            <param type="float" name="Z"></param>
+                        </accessor>
+                    </technique_common>
+                </source>
+                <vertices id="$name_Vertex">
+                    <input semantic="POSITION" source="#$name_Position"/>
+                </vertices>
+                <polygons count="polygonCount" material="$name_Material">
+                    <input offset="0" semantic="VERTEX" source="#$name_Vertex"/>
+$polygonBlock
+                </polygons>
+            </mesh>
+        </geometry>
     """
     override val openPolygon = "<p>"
     override val closePolygon = "</p>\n"
@@ -168,7 +172,9 @@ $polygonBlock
         val vertexCount = ( discretisation + 1 ) * ( discretisation + 1 ) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange", 8)
+        fillInTemplate(rawXml, outputName, xyzArray, polygonBlock, "cube", polygonCount, 8,
+                       vertexCount, xyzArrayCount, "trilinearLagrange", 8,
+                       new StringBuilder(), "")
     }
 
 
@@ -233,7 +239,7 @@ $polygonBlock
         val vertexCount = 3 * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange", 8)
+        fillInTemplate(rawXml, outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange", 8, new StringBuilder(), "")
     }
 
 
@@ -295,7 +301,7 @@ $polygonBlock
         val vertexCount = (discretisation + 1) * (discretisation + 1) * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange", 8)
+        fillInTemplate(rawXml, outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange", 8, new StringBuilder(), "")
     }
 
     def export1DFromFieldML(
@@ -358,6 +364,6 @@ $polygonBlock
         val vertexCount = (discretisation + 1) * 2 * elementCount
         val xyzArrayCount = vertexCount * 3
 
-        fillInTemplate(outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange", 8)
+        fillInTemplate(rawXml, outputName, xyzArray, polygonBlock, "cube", polygonCount, 8, vertexCount, xyzArrayCount, "trilinearLagrange", 8, new StringBuilder(), "")
     }
 }

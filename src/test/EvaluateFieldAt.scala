@@ -42,7 +42,7 @@ object EvaluateFieldAt
       println("Usage: EvaluateFieldAt xmlFilePath region expression\r\n" +
               "expression: empty | bind name value expression | evaluate name expression\r\n" +
               "                  | evaluateImage filename outputEval valueEval coordEval\r\n" +
-              "                  | evaluateMesh3d (collada|fieldml) filename outputMeshName discretisationPointsPerXiPerMesh meshArgumentInputEval rcCoordOutputEvaluator\r\n" +
+              "                  | evaluateMesh3d (collada|fieldml) filename outputMeshName discretisationPointsPerXiPerMesh meshArgumentInputEval [rcCoordEvaluator fieldEvaluator ... fieldEvaluator]\r\n" +
               "name, region: dotted FieldML identifiers\r\n" +
               "value: A series of values (value production below) surrounded by []\r\n" +
               "value: meshValue int listOfDoubleValuesSpaceSeparated | ensembleValue int | continuousValue listOfDoubleValues")
@@ -123,11 +123,11 @@ object EvaluateFieldAt
             }
             ImageIO.write(bim, "PNG", new File(fn))
           }
-          case EvaluateMesh3DAction(outformat, fn, outMeshName, discretisation, meshEvalName, rc3EvalName) => {
+          case EvaluateMesh3DAction(outformat, fn, outMeshName, discretisation, meshEvalName, rc3EvalNames) => {
             val fw = new FileWriter(fn)
             val res = (outformat match { case FieldMLOutput => SimpleFieldMLExporter
                                          case ColladaOutput => ColladaExporter }).
-                      export3DFromFieldML(outMeshName, region, discretisation, meshEvalName, rc3EvalName)
+                      export3DFromFieldML(outMeshName, region, discretisation, meshEvalName, rc3EvalNames)
             fw.write(res)
             fw.close()
           }
@@ -141,7 +141,7 @@ object EvaluateFieldAt
   case class BindParameterAction(bindArgumentName : String, bindValues : MakeValue) extends FieldAction
   case class EvaluateAction(evaluateField : String) extends FieldAction
   case class EvaluateImageAction(storeTo : String, inputEval : String, valueEval : String, coordEval : String) extends FieldAction
-  case class EvaluateMesh3DAction(outformat : OutputFormat, storeTo : String, outMeshName : String, discretisation : Int, meshValueEval : String, rc3Eval : String) extends FieldAction
+  case class EvaluateMesh3DAction(outformat : OutputFormat, storeTo : String, outMeshName : String, discretisation : Int, meshValueEvals : String, rc3Eval : List[String]) extends FieldAction
   sealed abstract class MakeValue
   case class MeshMakeValue(meshElement : Int, meshXIs : List[Double]) extends MakeValue
   case class EnsembleMakeValue(ensembleID : Int) extends MakeValue
@@ -169,9 +169,9 @@ object EvaluateFieldAt
                regex(new Regex("[A-Z|a-z|0-9|_|]+")) ~
                intParser ~
                regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ~
-               regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+")) ^^
-               (p => p match { case t~fn~outputMeshName~discretisation~inputEval~coordEval =>
-                 new EvaluateMesh3DAction(t, fn, outputMeshName, discretisation, inputEval, coordEval) }))
+               ("[" ~> rep(regex(new Regex("[A-Z|a-z|\\.|0-9|_|\\-|/]+"))) <~ "]") ^^
+               (p => p match { case t~fn~outputMeshName~discretisation~inputEval~coordEvals =>
+                 new EvaluateMesh3DAction(t, fn, outputMeshName, discretisation, inputEval, coordEvals) }))
 
     def valueParser = meshValueParser | ensembleValueParser | continuousValueParser
     def meshValueParser = "meshValue" ~> commit(intParser ~ rep(doubleParser) ^^
